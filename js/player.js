@@ -24,6 +24,7 @@ const Player = {
       return;
     }
 
+    console.log('[NEONWAVE] Creating YouTube player...');
     try {
       this.ytPlayer = new YT.Player('youtube-player', {
         height: '1',
@@ -52,6 +53,7 @@ const Player = {
       });
     } catch (err) {
       console.error('[NEONWAVE] YouTube player init error:', err);
+      App.toast('播放器初始化失敗，請重新整理頁面', 'error');
     }
   },
 
@@ -91,18 +93,19 @@ const Player = {
       150: '嵌入功能已被禁止',
     };
     const msg = errors[event.data] || `播放錯誤 (${event.data})`;
-    console.error('[NEONWAVE] YouTube error:', msg);
+    console.error('[NEONWAVE] YouTube error:', msg, 'Code:', event.data);
     App.toast(msg, 'error');
 
     // 自動跳下一首
-    setTimeout(() => this.next(), 1500);
+    setTimeout(() => this.next(), 2000);
   },
 
   // --- 播放控制 ---
   play(videoId) {
     if (!this.isReady || !this.ytPlayer) {
-      console.warn('[NEONWAVE] Player not ready, retrying in 1s...');
-      setTimeout(() => this.play(videoId), 1000);
+      console.warn('[NEONWAVE] Player not ready, retrying...');
+      App.toast('播放器載入中...');
+      setTimeout(() => this.play(videoId), 1500);
       return;
     }
 
