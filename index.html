@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEONWAVE — Cyberpunk Music Visualizer</title>
+  <meta name="description" content="NEONWAVE — 賽博龐克霓虹音樂視覺化播放器。搜尋播放、歌單管理、3D 粒子視覺效果。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/animations.css">
+</head>
+<body>
+  <!-- 背景層 -->
+  <div id="bg-grid" aria-hidden="true"></div>
+  <div id="bg-scanlines" aria-hidden="true"></div>
+  <div id="album-bg" aria-hidden="true"></div>
+
+  <!-- Three.js 視覺化畫布 -->
+  <canvas id="visualizer-canvas" aria-hidden="true"></canvas>
+
+  <!-- 啟動畫面 -->
+  <div id="splash">
+    <div class="splash-content">
+      <div class="splash-logo">
+        <span class="splash-neon">NEON</span><span class="splash-wave">WAVE</span>
+      </div>
+      <div class="splash-tagline">CYBERPUNK MUSIC VISUALIZER</div>
+      <div class="splash-loader">
+        <div class="loader-bar"></div>
+      </div>
+      <div class="splash-enter">INITIALIZING...</div>
+    </div>
+  </div>
+
+  <!-- 頂部搜尋區 -->
+  <header id="search-area">
+    <div class="search-box">
+      <button id="search-submit" type="button" aria-label="搜尋">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </button>
+      <input id="search-input" type="text" placeholder="搜尋音樂、藝術家或貼上 YouTube URL..." autocomplete="off" spellcheck="false">
+      <button id="search-clear" type="button" aria-label="清除" style="display:none">×</button>
+      <button id="btn-api-settings" type="button" class="settings-btn" title="YouTube API 設定">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+    <div id="search-results" class="glass-panel"></div>
+  </header>
+
+  <!-- 右側視覺控制台 -->
+  <aside id="fx-panel" class="side-panel right-panel">
+    <div class="panel-header">
+      <div class="panel-title">VISUAL CONSOLE</div>
+      <div class="panel-sub">視覺控制台</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">預設效果</div>
+      <div class="preset-grid" id="preset-grid"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">粒子控制</div>
+      <div class="slider-row">
+        <label>強度</label>
+        <input type="range" id="fx-intensity" min="0.1" max="2" step="0.01" value="1">
+        <output>1.00</output>
+      </div>
+      <div class="slider-row">
+        <label>速度</label>
+        <input type="range" id="fx-speed" min="0.1" max="3" step="0.01" value="1">
+        <output>1.00</output>
+      </div>
+      <div class="slider-row">
+        <label>粒子大小</label>
+        <input type="range" id="fx-size" min="0.5" max="3" step="0.01" value="1">
+        <output>1.00</output>
+      </div>
+      <div class="slider-row">
+        <label>發光強度</label>
+        <input type="range" id="fx-glow" min="0" max="2" step="0.01" value="1">
+        <output>1.00</output>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">色彩</div>
+      <div class="color-row">
+        <label>主色</label>
+        <input type="color" id="color-primary" value="#FF2D7B">
+        <span class="color-hex" id="color-primary-hex">#FF2D7B</span>
+      </div>
+      <div class="color-row">
+        <label>副色</label>
+        <input type="color" id="color-secondary" value="#B026FF">
+        <span class="color-hex" id="color-secondary-hex">#B026FF</span>
+      </div>
+      <div class="color-row">
+        <label>背景</label>
+        <input type="color" id="color-bg" value="#0A0A0F">
+        <span class="color-hex" id="color-bg-hex">#0A0A0F</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">效果開關</div>
+      <div class="toggle-grid">
+        <div class="toggle-item" id="t-scanlines">
+          <span>掃描線</span>
+          <div class="toggle-dot"></div>
+        </div>
+        <div class="toggle-item" id="t-chromatic">
+          <span>色差效果</span>
+          <div class="toggle-dot"></div>
+        </div>
+        <div class="toggle-item" id="t-bloom">
+          <span>溢光</span>
+          <div class="toggle-dot active"></div>
+        </div>
+        <div class="toggle-item active" id="t-grid">
+          <span>網格背景</span>
+          <div class="toggle-dot active"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-actions">
+      <button class="btn-ghost" id="btn-reset-fx">恢復默認</button>
+    </div>
+  </aside>
+
+  <!-- 左側歌單面板 -->
+  <aside id="playlist-panel" class="side-panel left-panel">
+    <div class="panel-header">
+      <div class="panel-title">PLAYLIST</div>
+      <div class="panel-sub">歌單管理</div>
+    </div>
+
+    <div class="panel-tabs">
+      <button class="tab active" data-tab="queue">播放佇列</button>
+      <button class="tab" data-tab="playlists">我的歌單</button>
+    </div>
+
+    <!-- 佇列面板 -->
+    <div class="tab-content active" id="tab-queue">
+      <div class="queue-toolbar">
+        <span class="queue-count" id="queue-count">0 首歌曲</span>
+        <div class="queue-actions">
+          <button class="btn-ghost small" id="btn-shuffle-queue">隨機</button>
+          <button class="btn-ghost small" id="btn-clear-queue">清空</button>
+        </div>
+      </div>
+      <div class="queue-list" id="queue-list">
+        <div class="empty-state">佇列為空<br>搜尋並添加音樂開始播放</div>
+      </div>
+    </div>
+
+    <!-- 歌單面板 -->
+    <div class="tab-content" id="tab-playlists">
+      <div class="playlist-toolbar">
+        <button class="btn-neon small" id="btn-create-playlist">+ 新建歌單</button>
+      </div>
+      <div class="playlist-list" id="playlist-list">
+        <div class="empty-state">尚未建立歌單</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主內容區 -->
+  <main id="main-content">
+    <!-- 首頁 -->
+    <section id="home-page" class="page active">
+      <div class="home-grid">
+        <div class="home-card" data-action="play-random">
+          <div class="card-icon">♫</div>
+          <div class="card-title">隨機播放</div>
+          <div class="card-sub">從歌單隨機開始</div>
+        </div>
+        <div class="home-card" data-action="playlists">
+          <div class="card-icon">≡</div>
+          <div class="card-title">我的歌單</div>
+          <div class="card-sub">管理收藏的音樂</div>
+        </div>
+        <div class="home-card" data-action="search">
+          <div class="card-icon">⌕</div>
+          <div class="card-title">搜尋音樂</div>
+          <div class="card-sub">從 YouTube 搜尋</div>
+        </div>
+        <div class="home-card" data-action="visuals">
+          <div class="card-icon">✦</div>
+          <div class="card-title">視覺效果</div>
+          <div class="card-sub">自訂粒子效果</div>
+        </div>
+      </div>
+
+      <div class="home-section" id="recent-section" style="display:none">
+        <div class="section-header">
+          <h2>最近播放</h2>
+          <button class="btn-ghost small" id="btn-clear-recent">清除</button>
+        </div>
+        <div class="track-grid" id="recent-tracks"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部播放控制列 -->
+  <footer id="bottom-bar">
+    <div class="bottom-glass"></div>
+
+    <!-- 進度條 -->
+    <div class="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+        <div class="progress-thumb" id="progress-thumb"></div>
+      </div>
+    </div>
+
+    <div class="controls-grid">
+      <!-- 左：歌曲資訊 -->
+      <div class="control-left">
+        <div class="track-cover" id="track-cover">
+          <div class="cover-placeholder">♫</div>
+        </div>
+        <div class="track-info">
+          <div class="track-title" id="track-title">NEONWAVE</div>
+          <div class="track-artist" id="track-artist">選擇音樂開始播放</div>
+        </div>
+        <button class="ctrl-btn" id="btn-like" title="收藏">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 中：播放控制 -->
+      <div class="control-center">
+        <div class="transport-controls">
+          <button class="ctrl-btn" id="btn-playmode" title="播放模式">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+          </button>
+          <button class="ctrl-btn" id="btn-prev" title="上一首">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+            </svg>
+          </button>
+          <button class="ctrl-btn play-btn" id="btn-play" title="播放">
+            <svg class="icon-play" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg class="icon-pause" width="24" height="24" fill="currentColor" viewBox="0 0 24 24" style="display:none">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+          </button>
+          <button class="ctrl-btn" id="btn-next" title="下一首">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+            </svg>
+          </button>
+          <button class="ctrl-btn" id="btn-mini-queue" title="佇列">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+            </svg>
+          </button>
+        </div>
+        <div class="time-display">
+          <span id="time-current">0:00</span>
+          <span class="time-sep">/</span>
+          <span id="time-total">0:00</span>
+        </div>
+      </div>
+
+      <!-- 右：音量與模式 -->
+      <div class="control-right">
+        <div class="volume-control">
+          <button class="ctrl-btn" id="btn-volume" title="音量">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </button>
+          <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.8">
+        </div>
+        <button class="ctrl-btn" id="btn-fullscreen" title="全螢幕">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 建立歌單彈窗 -->
+  <div id="modal-create-playlist" class="modal-overlay" style="display:none">
+    <div class="modal glass-panel">
+      <div class="modal-header">
+        <h3>新建歌單</h3>
+        <button class="modal-close" aria-label="關閉">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="playlist-name-input" class="input-glass" placeholder="歌單名稱" maxlength="50">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost modal-cancel">取消</button>
+        <button class="btn-neon" id="btn-confirm-create">建立</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 歌曲詳情彈窗 -->
+  <div id="modal-track-detail" class="modal-overlay" style="display:none">
+    <div class="modal glass-panel wide">
+      <div class="modal-header">
+        <h3 id="detail-title">歌曲詳情</h3>
+        <button class="modal-close" aria-label="關閉">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-cover" id="detail-cover"></div>
+        <div class="detail-info">
+          <div class="detail-name" id="detail-name"></div>
+          <div class="detail-artist" id="detail-artist"></div>
+          <div class="detail-source" id="detail-source"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost modal-cancel">關閉</button>
+        <button class="btn-neon" id="btn-add-to-queue">加入佇列</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube API Key 設定彈窗 -->
+  <div id="modal-api-key" class="modal-overlay" style="display:none">
+    <div class="modal glass-panel">
+      <div class="modal-header">
+        <h3>YouTube API Key 設定</h3>
+        <button class="modal-close" aria-label="關閉">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="api-key-notice">
+          <strong>如何取得 YouTube Data API v3 Key：</strong>
+          <code>
+            1. 前往 https://console.cloud.google.com/<br>
+            2. 建立或選擇一個專案<br>
+            3. 在「API 和服務」中啟用 YouTube Data API v3<br>
+            4. 在「憑證」中建立 API Key<br>
+            5. 將 API Key 貼到下方
+          </code>
+        </div>
+        <input type="text" id="api-key-input" class="input-glass" placeholder="貼上你的 YouTube API Key" style="margin-top: 12px;">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost modal-cancel">取消</button>
+        <button class="btn-neon" id="btn-save-api-key">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube iframe 容器（隱藏） -->
+  <div id="youtube-player" style="position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;"></div>
+
+  <!-- Toast 通知 -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- 隱藏的 YouTube iframe API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/playlist.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/controls.js"></script>
+</body>
+</html>
