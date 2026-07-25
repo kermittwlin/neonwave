@@ -165,7 +165,7 @@ const Search = {
       return this.getMockResults(query);
     }
 
-    let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=15&key=${this.apiKey}`;
+    let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=15&key=${this.apiKey}`;
 
     if (loadMore && this.nextPageToken) {
       url += `&pageToken=${this.nextPageToken}`;
@@ -178,8 +178,15 @@ const Search = {
 
     const data = await response.json();
 
+    // 過濾出影片結果（排除頻道和播放清單）
+    const videoItems = data.items.filter(item => item.id.kind === 'youtube#video');
+
+    if (videoItems.length === 0) {
+      return { tracks: [], nextPageToken: '' };
+    }
+
     // 獲取影片詳細資訊（包括長度）
-    const videoIds = data.items.map(item => item.id.videoId).join(',');
+    const videoIds = videoItems.map(item => item.id.videoId).join(',');
     const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoIds}&key=${this.apiKey}`;
     const detailsResponse = await fetch(detailsUrl);
     const detailsData = await detailsResponse.json();
