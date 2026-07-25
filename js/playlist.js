@@ -7,9 +7,10 @@ const Playlist = {
     this.renderPlaylists();
     this.updateQueueUI();
     this.initCreatePlaylist();
+    this.initAddToPlaylist();
   },
 
-  // --- 歌單管理 ---
+  // --- 建立歌單 ---
   initCreatePlaylist() {
     const createBtn = document.getElementById('btn-create-playlist');
     const confirmBtn = document.getElementById('btn-confirm-create');
@@ -35,7 +36,51 @@ const Playlist = {
     });
   },
 
-  // --- 建立歌單 ---
+  // --- 加入歌單 ---
+  initAddToPlaylist() {
+    // 此功能由搜尋結果和佇列項目的按鈕觸發
+  },
+
+  openAddToPlaylistModal(track) {
+    if (!track) return;
+    this._pendingTrack = track;
+
+    const info = document.getElementById('add-track-info');
+    info.innerHTML = `
+      ${track.thumbnail ? `<img src="${track.thumbnail}" alt="">` : '<div style="width:48px;height:48px;background:var(--bg-tertiary);border-radius:6px;display:flex;align-items:center;justify-content:center">♫</div>'}
+      <div>
+        <div class="track-name">${this.escapeHtml(track.title)}</div>
+        <div class="track-artist-name">${this.escapeHtml(track.artist || '未知')}</div>
+      </div>
+    `;
+
+    const list = document.getElementById('add-playlist-list');
+    if (App.state.playlists.length === 0) {
+      list.innerHTML = '<div class="empty-state">尚未建立歌單<br>請先建立歌單</div>';
+    } else {
+      list.innerHTML = App.state.playlists.map(pl => `
+        <div class="add-playlist-item" data-id="${pl.id}">
+          <div class="pl-icon">♫</div>
+          <div>
+            <div class="pl-name">${this.escapeHtml(pl.name)}</div>
+            <div class="pl-count">${pl.tracks.length} 首歌曲</div>
+          </div>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.add-playlist-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const plId = item.dataset.id;
+          this.addToPlaylist(plId, this._pendingTrack);
+          App.closeModal(document.getElementById('modal-add-to-playlist'));
+        });
+      });
+    }
+
+    App.openModal('modal-add-to-playlist');
+  },
+
+  // --- CRUD ---
   createPlaylist(name) {
     const playlist = {
       id: 'pl-' + Date.now(),
@@ -48,7 +93,6 @@ const Playlist = {
     this.renderPlaylists();
   },
 
-  // --- 刪除歌單 ---
   deletePlaylist(id) {
     App.state.playlists = App.state.playlists.filter(p => p.id !== id);
     this.savePlaylists();
@@ -56,7 +100,6 @@ const Playlist = {
     App.toast('歌單已刪除');
   },
 
-  // --- 添加歌曲到歌單 ---
   addToPlaylist(playlistId, track) {
     const playlist = App.state.playlists.find(p => p.id === playlistId);
     if (playlist && !playlist.tracks.find(t => t.id === track.id)) {
@@ -64,10 +107,11 @@ const Playlist = {
       this.savePlaylists();
       this.renderPlaylists();
       App.toast(`已添加到「${playlist.name}」`);
+    } else if (playlist) {
+      App.toast('歌曲已在歌單中');
     }
   },
 
-  // --- 從歌單移除歌曲 ---
   removeFromPlaylist(playlistId, trackId) {
     const playlist = App.state.playlists.find(p => p.id === playlistId);
     if (playlist) {
@@ -77,7 +121,6 @@ const Playlist = {
     }
   },
 
-  // --- 播放歌單 ---
   playPlaylist(playlistId) {
     const playlist = App.state.playlists.find(p => p.id === playlistId);
     if (playlist && playlist.tracks.length > 0) {
@@ -90,7 +133,6 @@ const Playlist = {
     }
   },
 
-  // --- 儲存 ---
   savePlaylists() {
     localStorage.setItem('neonwave-playlists', JSON.stringify(App.state.playlists));
   },
@@ -127,7 +169,6 @@ const Playlist = {
       </div>
     `).join('');
 
-    // 綁定事件
     container.querySelectorAll('.playlist-item').forEach(item => {
       const id = item.dataset.id;
 
@@ -172,6 +213,11 @@ const Playlist = {
             <div class="q-title">${this.escapeHtml(track.title)}</div>
             <div class="q-artist">${this.escapeHtml(track.artist || '未知')}</div>
           </div>
+          <button class="q-add-to-pl" title="加入歌單">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
           <button class="q-remove" title="移除">
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path d="M18 6L6 18M6 6l12 12"/>
@@ -181,12 +227,11 @@ const Playlist = {
       `;
     }).join('');
 
-    // 綁定事件
     container.querySelectorAll('.queue-item').forEach(item => {
       const index = parseInt(item.dataset.index);
 
       item.addEventListener('click', (e) => {
-        if (e.target.closest('.q-remove')) return;
+        if (e.target.closest('.q-remove') || e.target.closest('.q-add-to-pl')) return;
         const track = queue[index];
         if (track) Player.playTrack(track);
       });
@@ -195,10 +240,14 @@ const Playlist = {
         e.stopPropagation();
         Player.removeFromQueue(index);
       });
+
+      item.querySelector('.q-add-to-pl').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openAddToPlaylistModal(queue[index]);
+      });
     });
   },
 
-  // --- HTML 轉義 ---
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -206,5 +255,4 @@ const Playlist = {
   },
 };
 
-// 初始化歌單
 document.addEventListener('DOMContentLoaded', () => Playlist.init());

@@ -468,4 +468,19 @@ document.addEventListener('DOMContentLoaded', () => {
     App.toast('已收藏');
     document.getElementById('btn-like')?.classList.toggle('liked');
   });
+
+  // 歌詞按鈕
+  document.getElementById('btn-lyrics')?.addEventListener('click', () => {
+    App.state.lyricsVisible = !App.state.lyricsVisible;
+    const lyricsDisplay = document.getElementById('lyrics-display');
+    if (lyricsDisplay) {
+      lyricsDisplay.classList.toggle('lyrics-hidden', !App.state.lyricsVisible);
+    }
+  });
+
+  // 關閉歌詞按鈕
+  document.getElementById('btn-close-lyrics')?.addEventListener('click', () => {
+    App.state.lyricsVisible = false;
+    document.getElementById('lyrics-display')?.classList.add('lyrics-hidden');
+  });
 });

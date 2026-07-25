@@ -10,9 +10,11 @@ const App = {
     playlists: JSON.parse(localStorage.getItem('neonwave-playlists') || '[]'),
     recent: JSON.parse(localStorage.getItem('neonwave-recent') || '[]'),
     settings: JSON.parse(localStorage.getItem('neonwave-settings') || '{}'),
-    playMode: 'loop', // loop, shuffle, single
+    playMode: 'loop',
     volume: 0.8,
     isPlaying: false,
+    lyricsVisible: false,
+    allHidden: false,
   },
 
   init() {
@@ -21,8 +23,8 @@ const App = {
     this.initPanels();
     this.initModals();
     this.initKeyboard();
-    this.initDragDrop();
-    this.initApiSettings();
+    this.initHideAll();
+    this.initMobileNav();
     this.state.isReady = true;
   },
 
@@ -56,10 +58,6 @@ const App = {
 
   onReady() {
     document.body.classList.add('app-ready');
-    // 顯示面板滑入指示
-    setTimeout(() => {
-      document.body.classList.add('show-panel-hints');
-    }, 1000);
   },
 
   // --- 面板控制 ---
@@ -68,13 +66,22 @@ const App = {
     const rightPanel = document.getElementById('fx-panel');
     let leftTimeout, rightTimeout;
 
-    // 左側面板滑入
-    document.addEventListener('mousemove', (e) => {
-      if (e.clientX < 30) {
-        clearTimeout(leftTimeout);
-        document.body.classList.add('panel-left-open');
-      }
-    });
+    // 桌面端：滑鼠靠近邊緣展開面板
+    if (window.innerWidth > 768) {
+      document.addEventListener('mousemove', (e) => {
+        if (e.clientX < 30) {
+          clearTimeout(leftTimeout);
+          document.body.classList.add('panel-left-open');
+        }
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (e.clientX > window.innerWidth - 30) {
+          clearTimeout(rightTimeout);
+          document.body.classList.add('panel-right-open');
+        }
+      });
+    }
 
     leftPanel.addEventListener('mouseenter', () => {
       clearTimeout(leftTimeout);
@@ -88,14 +95,6 @@ const App = {
           document.body.classList.remove('panel-left-open');
         }
       }, 300);
-    });
-
-    // 右側面板滑入
-    document.addEventListener('mousemove', (e) => {
-      if (e.clientX > window.innerWidth - 30) {
-        clearTimeout(rightTimeout);
-        document.body.classList.add('panel-right-open');
-      }
     });
 
     rightPanel.addEventListener('mouseenter', () => {
@@ -137,21 +136,6 @@ const App = {
         this.closeModal(btn.closest('.modal-overlay'));
       });
     });
-
-    // API Key 設定
-    const apiKeyInput = document.getElementById('api-key-input');
-    const saveApiKeyBtn = document.getElementById('btn-save-api-key');
-    if (saveApiKeyBtn && apiKeyInput) {
-      saveApiKeyBtn.addEventListener('click', () => {
-        const key = apiKeyInput.value.trim();
-        if (key) {
-          Search.setApiKey(key);
-          this.closeModal(document.getElementById('modal-api-key'));
-        } else {
-          this.toast('請輸入 API Key', 'error');
-        }
-      });
-    }
   },
 
   openModal(id) {
@@ -163,6 +147,7 @@ const App = {
   },
 
   closeModal(modal) {
+    if (!modal) return;
     modal.classList.remove('open');
     setTimeout(() => { modal.style.display = 'none'; }, 300);
   },
@@ -200,6 +185,9 @@ const App = {
         case 'KeyL':
           document.getElementById('search-input').focus();
           break;
+        case 'KeyH':
+          this.toggleHideAll();
+          break;
         case 'Escape':
           this.closeAllModals();
           break;
@@ -207,49 +195,87 @@ const App = {
     });
   },
 
-  // --- 拖曳上傳 ---
-  initDragDrop() {
-    const overlay = document.createElement('div');
-    overlay.className = 'drop-overlay';
-    overlay.innerHTML = `
-      <div class="drop-content">
-        <div class="drop-icon">♫</div>
-        <div class="drop-text">DROP MUSIC HERE</div>
+  // --- 隱藏所有面板 ---
+  initHideAll() {
+    const hideBtn = document.getElementById('btn-hide-all');
+    if (hideBtn) {
+      hideBtn.addEventListener('click', () => this.toggleHideAll());
+    }
+  },
+
+  toggleHideAll() {
+    this.state.allHidden = !this.state.allHidden;
+    document.body.classList.toggle('all-hidden', this.state.allHidden);
+  },
+
+  // --- 手機底部導航 ---
+  initMobileNav() {
+    // 建立手機導航列
+    const nav = document.createElement('nav');
+    nav.className = 'mobile-nav';
+    nav.innerHTML = `
+      <div class="mobile-nav-inner">
+        <button class="mobile-nav-btn" data-action="home">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          </svg>
+          <span>首頁</span>
+        </button>
+        <button class="mobile-nav-btn" data-action="search">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <span>搜尋</span>
+        </button>
+        <button class="mobile-nav-btn" data-action="playlists">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+          </svg>
+          <span>歌單</span>
+        </button>
+        <button class="mobile-nav-btn" data-action="visuals">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M4 7h8M16 7h4M4 17h4M12 17h8"/>
+            <circle cx="14" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>
+          </svg>
+          <span>視覺</span>
+        </button>
       </div>
     `;
-    document.body.appendChild(overlay);
+    document.body.appendChild(nav);
 
-    let dragCounter = 0;
-
-    document.addEventListener('dragenter', (e) => {
-      e.preventDefault();
-      dragCounter++;
-      overlay.classList.add('active');
+    // 綁定事件
+    nav.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        switch (action) {
+          case 'home':
+            this.closeAllPanels();
+            break;
+          case 'search':
+            document.getElementById('search-input').focus();
+            break;
+          case 'playlists':
+            document.body.classList.toggle('panel-left-open');
+            break;
+          case 'visuals':
+            document.body.classList.toggle('panel-right-open');
+            break;
+        }
+      });
     });
+  },
 
-    document.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dragCounter--;
-      if (dragCounter === 0) overlay.classList.remove('active');
-    });
-
-    document.addEventListener('dragover', (e) => {
-      e.preventDefault();
-    });
-
-    document.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dragCounter = 0;
-      overlay.classList.remove('active');
-      // TODO: 處理檔案上傳
-    });
+  closeAllPanels() {
+    document.body.classList.remove('panel-left-open', 'panel-right-open');
   },
 
   // --- 音量控制 ---
   setVolume(vol) {
     this.state.volume = vol;
     Player.setVolume(vol);
-    document.getElementById('volume-slider').value = vol;
+    const slider = document.getElementById('volume-slider');
+    if (slider) slider.value = vol;
     this.saveSettings();
   },
 
@@ -297,20 +323,6 @@ const App = {
     toast.textContent = message;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
-  },
-
-  // --- API 設定 ---
-  initApiSettings() {
-    const settingsBtn = document.getElementById('btn-api-settings');
-    if (settingsBtn) {
-      settingsBtn.addEventListener('click', () => {
-        const apiKeyInput = document.getElementById('api-key-input');
-        if (apiKeyInput) {
-          apiKeyInput.value = Search.apiKey || '';
-        }
-        this.openModal('modal-api-key');
-      });
-    }
   },
 };
 

@@ -318,12 +318,11 @@ const Search = {
     const items = results.querySelectorAll('.search-result-item');
 
     items.forEach(item => {
-      // 如果是附加的，跳過已綁定的
       if (append && item.dataset.bound) return;
       item.dataset.bound = 'true';
 
       item.addEventListener('click', (e) => {
-        if (e.target.closest('.result-add')) return;
+        if (e.target.closest('.result-add') || e.target.closest('.result-add-pl')) return;
         const trackId = item.dataset.id;
         const track = tracks.find(t => t.id === trackId);
         if (track) {
@@ -347,6 +346,20 @@ const Search = {
         }
       });
     });
+
+    results.querySelectorAll('.result-add-pl').forEach(btn => {
+      if (append && btn.dataset.bound) return;
+      btn.dataset.bound = 'true';
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const trackId = btn.closest('.search-result-item').dataset.id;
+        const track = tracks.find(t => t.id === trackId);
+        if (track) {
+          Playlist.openAddToPlaylistModal(track);
+        }
+      });
+    });
   },
 
   // --- 建立結果項目 HTML ---
@@ -363,9 +376,14 @@ const Search = {
           <div class="result-artist">${this.escapeHtml(track.artist || '未知')}</div>
         </div>
         <div class="result-duration">${track.duration || ''}</div>
-        <button class="result-add" title="加入佇列">
+        <button class="result-add-pl" title="加入歌單">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+        <button class="result-add" title="播放">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
           </svg>
         </button>
       </div>
