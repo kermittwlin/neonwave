@@ -6,7 +6,7 @@ const Search = {
   isOpen: false,
   lastQuery: '',
   isLoading: false,
-  apiKey: localStorage.getItem('neonwave-yt-apikey') || '',
+  apiKey: localStorage.getItem('neonwave-yt-apikey') || 'AIzaSyAk69vBCPQPZpHX1SQd_rK4rwe8MAn21No',
   nextPageToken: '',
   currentQuery: '',
 
