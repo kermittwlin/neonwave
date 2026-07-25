@@ -1,5 +1,5 @@
 /* ============================================
-   NEONWAVE — Three.js Visualizer Module
+   NEONWAVE — Three.js Visualizer with Beat Detection
    ============================================ */
 
 const Visualizer = {
@@ -13,6 +13,29 @@ const Visualizer = {
   presets: {},
   currentPreset: 'neonSpiral',
 
+  // 音訊分析
+  audioContext: null,
+  analyser: null,
+  dataArray: null,
+  beatDetector: {
+    threshold: 0.15,
+    decay: 0.98,
+    energy: 0,
+    lastBeat: 0,
+    bpm: 0,
+    isBeat: false,
+    beatIntensity: 0,
+  },
+
+  // 節奏資料
+  rhythm: {
+    bass: 0,
+    mid: 0,
+    treble: 0,
+    overall: 0,
+    isPlaying: false,
+  },
+
   config: {
     particleCount: 2000,
     intensity: 1,
@@ -22,6 +45,7 @@ const Visualizer = {
     colorPrimary: '#FF2D7B',
     colorSecondary: '#B026FF',
     colorBg: '#0A0A0F',
+    beatReactive: true,
     effects: {
       scanlines: false,
       chromatic: false,
@@ -58,6 +82,9 @@ const Visualizer = {
     // 時鐘
     this.clock = new THREE.Clock();
 
+    // 初始化音訊分析
+    this.initAudio();
+
     // 初始化預設
     this.initPresets();
 
@@ -67,13 +94,124 @@ const Visualizer = {
     // 事件
     window.addEventListener('resize', () => this.onResize());
 
+    // 監聽播放狀態
+    this.startPlaybackMonitor();
+
     // 開始渲染
     this.animate();
   },
 
+  // --- 音訊分析初始化 ---
+  initAudio() {
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.8;
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      console.log('[NEONWAVE] Audio analyzer initialized');
+    } catch (e) {
+      console.warn('[NEONWAVE] Web Audio API not supported, using simulated beats');
+    }
+  },
+
+  // --- 監聽播放狀態 ---
+  startPlaybackMonitor() {
+    setInterval(() => {
+      this.rhythm.isPlaying = App?.state?.isPlaying || false;
+      if (this.rhythm.isPlaying && this.analyser) {
+        this.analyzeAudio();
+      } else {
+        this.simulateBeats();
+      }
+    }, 50);
+  },
+
+  // --- 分析音訊 ---
+  analyzeAudio() {
+    if (!this.analyser || !this.dataArray) return;
+
+    try {
+      this.analyser.getByteFrequencyData(this.dataArray);
+
+      // 計算頻段能量
+      const bufferLength = this.dataArray.length;
+      let bassSum = 0, midSum = 0, trebleSum = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const value = this.dataArray[i] / 255;
+        if (i < bufferLength * 0.15) {
+          bassSum += value;
+        } else if (i < bufferLength * 0.5) {
+          midSum += value;
+        } else {
+          trebleSum += value;
+        }
+      }
+
+      this.rhythm.bass = bassSum / (bufferLength * 0.15);
+      this.rhythm.mid = midSum / (bufferLength * 0.35);
+      this.rhythm.treble = trebleSum / (bufferLength * 0.5);
+      this.rhythm.overall = (this.rhythm.bass + this.rhythm.mid + this.rhythm.treble) / 3;
+
+      // 節拍檢測
+      this.detectBeat();
+
+    } catch (e) {
+      this.simulateBeats();
+    }
+  },
+
+  // --- 節拍檢測 ---
+  detectBeat() {
+    const now = performance.now();
+    const energy = this.rhythm.bass;
+
+    // 更新能量
+    this.beatDetector.energy = this.beatDetector.energy * this.beatDetector.decay + energy * (1 - this.beatDetector.decay);
+
+    // 檢測節拍
+    if (energy > this.beatDetector.energy * 1.5 && energy > this.beatDetector.threshold) {
+      if (now - this.beatDetector.lastBeat > 200) {
+        this.beatDetector.isBeat = true;
+        this.beatDetector.beatIntensity = Math.min(1, energy * 2);
+        this.beatDetector.lastBeat = now;
+      }
+    } else {
+      this.beatDetector.isBeat = false;
+      this.beatDetector.beatIntensity *= 0.9;
+    }
+  },
+
+  // --- 模擬節拍（無音訊時） ---
+  simulateBeats() {
+    const now = performance.now();
+    const time = now / 1000;
+
+    // 使用多個正弦波組合模擬音樂節奏
+    const wave1 = Math.sin(time * 2.1) * 0.5 + 0.5;
+    const wave2 = Math.sin(time * 3.7) * 0.3 + 0.3;
+    const wave3 = Math.sin(time * 5.3) * 0.2 + 0.2;
+    const combined = (wave1 + wave2 + wave3) / 3;
+
+    this.rhythm.bass = combined;
+    this.rhythm.mid = combined * 0.8;
+    this.rhythm.treble = combined * 0.6;
+    this.rhythm.overall = combined * 0.7;
+
+    // 模擬節拍
+    const beatPhase = (time * 2.2) % 1;
+    if (beatPhase < 0.1) {
+      this.beatDetector.isBeat = true;
+      this.beatDetector.beatIntensity = 0.8 + Math.random() * 0.2;
+    } else {
+      this.beatDetector.isBeat = false;
+      this.beatDetector.beatIntensity *= 0.92;
+    }
+  },
+
   // --- 粒子系統 ---
   createParticles(preset) {
-    // 移除舊粒子
     if (this.particles) {
       this.scene.remove(this.particles);
       this.geometry.dispose();
@@ -94,23 +232,19 @@ const Visualizer = {
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 根據預設設定初始位置
       const pos = this.getInitialPosition(preset, i, count);
       positions[i3] = pos.x;
       positions[i3 + 1] = pos.y;
       positions[i3 + 2] = pos.z;
 
-      // 隨機顏色
       const mixRatio = Math.random();
       const color = color1.clone().lerp(color2, mixRatio);
       colors[i3] = color.r;
       colors[i3 + 1] = color.g;
       colors[i3 + 2] = color.b;
 
-      // 大小
       sizes[i] = Math.random() * 2 + 0.5;
 
-      // 速度
       velocities[i3] = (Math.random() - 0.5) * 0.02;
       velocities[i3 + 1] = (Math.random() - 0.5) * 0.02;
       velocities[i3 + 2] = (Math.random() - 0.5) * 0.02;
@@ -121,7 +255,6 @@ const Visualizer = {
     this.geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
     this.geometry.userData = { velocities };
 
-    // 材質
     this.material = new THREE.PointsMaterial({
       size: 0.5 * this.config.size,
       vertexColors: true,
@@ -132,7 +265,6 @@ const Visualizer = {
       sizeAttenuation: true,
     });
 
-    // 粒子系統
     this.particles = new THREE.Points(this.geometry, this.material);
     this.scene.add(this.particles);
   },
@@ -183,7 +315,6 @@ const Visualizer = {
       particleStorm: { name: '粒子風暴', update: (t) => this.updateStorm(t) },
     };
 
-    // 渲染預設按鈕
     const grid = document.getElementById('preset-grid');
     if (grid) {
       grid.innerHTML = Object.entries(this.presets).map(([key, preset]) => `
@@ -208,34 +339,65 @@ const Visualizer = {
     requestAnimationFrame(() => this.animate());
 
     const elapsed = this.clock.getElapsedTime() * this.config.speed;
-    const delta = this.clock.getDelta();
 
     if (this.particles) {
+      // 獲取節奏數據
+      const bass = this.rhythm.bass;
+      const mid = this.rhythm.mid;
+      const treble = this.rhythm.treble;
+      const beat = this.beatDetector.beatIntensity;
+      const isBeat = this.beatDetector.isBeat;
+
       // 執行當前預設的更新
       const preset = this.presets[this.currentPreset];
       if (preset && preset.update) {
         preset.update(elapsed);
       }
 
-      // 更新粒子大小
-      this.material.size = 0.5 * this.config.size;
+      // 節奏反應：粒子大小
+      if (this.config.beatReactive) {
+        const baseSize = 0.5 * this.config.size;
+        const beatSize = isBeat ? baseSize * (1 + beat * 0.8) : baseSize;
+        this.material.size = beatSize;
+
+        // 節奏反應：透明度
+        this.material.opacity = 0.6 + bass * 0.4;
+
+        // 節奏反應：相機晃動
+        if (isBeat) {
+          this.camera.position.x += (Math.random() - 0.5) * beat * 0.5;
+          this.camera.position.y += (Math.random() - 0.5) * beat * 0.5;
+        }
+      }
     }
 
     this.renderer.render(this.scene, this.camera);
   },
 
-  // --- 預設更新函數 ---
+  // --- 預設更新函數（加入節奏反應） ---
   updateSpiral(t) {
     const positions = this.geometry.attributes.position.array;
     const count = this.config.particleCount;
+    const bass = this.rhythm.bass;
+    const beat = this.beatDetector.beatIntensity;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const ratio = i / count;
 
-      positions[i3] += Math.sin(t + ratio * 10) * 0.02 * this.config.intensity;
-      positions[i3 + 1] += Math.cos(t + ratio * 10) * 0.02 * this.config.intensity;
-      positions[i3 + 2] += Math.sin(t * 0.5 + ratio * 5) * 0.01 * this.config.intensity;
+      // 基礎旋轉
+      const speed = this.config.intensity * (1 + bass * 0.5);
+      positions[i3] += Math.sin(t + ratio * 10) * 0.02 * speed;
+      positions[i3 + 1] += Math.cos(t + ratio * 10) * 0.02 * speed;
+      positions[i3 + 2] += Math.sin(t * 0.5 + ratio * 5) * 0.01 * speed;
+
+      // 節拍擴散效果
+      if (this.config.beatReactive && beat > 0.3) {
+        const dist = Math.sqrt(positions[i3] ** 2 + positions[i3 + 1] ** 2);
+        const push = beat * 0.3 * (1 - dist / 50);
+        positions[i3] += (positions[i3] / (dist || 1)) * push;
+        positions[i3 + 1] += (positions[i3 + 1] / (dist || 1)) * push;
+      }
 
       // 邊界循環
       if (positions[i3] > 50) positions[i3] = -50;
@@ -246,23 +408,31 @@ const Visualizer = {
 
     this.geometry.attributes.position.needsUpdate = true;
 
-    // 相機旋轉
-    this.camera.position.x = Math.sin(t * 0.1) * 10;
-    this.camera.position.y = Math.cos(t * 0.1) * 10;
+    // 相機旋轉（受低音影響）
+    const camSpeed = 0.1 + bass * 0.05;
+    this.camera.position.x = Math.sin(t * camSpeed) * 10;
+    this.camera.position.y = Math.cos(t * camSpeed) * 10;
     this.camera.lookAt(0, 0, 0);
   },
 
   updateMatrixRain(t) {
     const positions = this.geometry.attributes.position.array;
     const count = this.config.particleCount;
+    const bass = this.rhythm.bass;
+
+    // 流速受音樂影響
+    const fallSpeed = 0.3 + bass * 0.4;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 向下流動
-      positions[i3 + 1] -= 0.3 * this.config.intensity;
+      positions[i3 + 1] -= fallSpeed * this.config.intensity;
 
-      // 隨機重置
+      // 節拍時粒子加速
+      if (this.beatDetector.isBeat && Math.random() > 0.8) {
+        positions[i3 + 1] -= 5;
+      }
+
       if (positions[i3 + 1] < -50) {
         positions[i3 + 1] = 50;
         positions[i3] = (Math.random() - 0.5) * 80;
@@ -280,24 +450,30 @@ const Visualizer = {
   updateNebula(t) {
     const positions = this.geometry.attributes.position.array;
     const count = this.config.particleCount;
+    const mid = this.rhythm.mid;
+    const beat = this.beatDetector.beatIntensity;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const angle = Math.atan2(positions[i3 + 1], positions[i3]);
       const radius = Math.sqrt(positions[i3] ** 2 + positions[i3 + 1] ** 2);
 
-      // 旋轉
-      const newAngle = angle + 0.005 * this.config.intensity;
+      // 旋轉速度受中音影響
+      const rotSpeed = 0.005 + mid * 0.008;
+      const newAngle = angle + rotSpeed * this.config.intensity;
       positions[i3] = radius * Math.cos(newAngle);
       positions[i3 + 1] = radius * Math.sin(newAngle);
 
-      // 呼吸效果
-      const breathe = Math.sin(t * 0.5) * 0.02 + 1;
+      // 呼吸效果（受低音影響）
+      const breathe = Math.sin(t * 0.5) * 0.02 + 1 + beat * 0.1;
       positions[i3] *= breathe;
       positions[i3 + 1] *= breathe;
 
       // Z 軸波動
       positions[i3 + 2] += Math.sin(t + i * 0.01) * 0.02 * this.config.intensity;
+      if (this.beatDetector.isBeat) {
+        positions[i3 + 2] += (Math.random() - 0.5) * 2;
+      }
     }
 
     this.geometry.attributes.position.needsUpdate = true;
@@ -311,16 +487,27 @@ const Visualizer = {
   updateStorm(t) {
     const positions = this.geometry.attributes.position.array;
     const count = this.config.particleCount;
+    const treble = this.rhythm.treble;
+    const beat = this.beatDetector.beatIntensity;
+
+    // 混亂程度受高音影響
+    const chaos = 0.1 + treble * 0.15;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 隨機亂流
-      positions[i3] += (Math.random() - 0.5) * 0.1 * this.config.intensity;
-      positions[i3 + 1] += (Math.random() - 0.5) * 0.1 * this.config.intensity;
-      positions[i3 + 2] += (Math.random() - 0.5) * 0.05 * this.config.intensity;
+      positions[i3] += (Math.random() - 0.5) * chaos * this.config.intensity;
+      positions[i3 + 1] += (Math.random() - 0.5) * chaos * this.config.intensity;
+      positions[i3 + 2] += (Math.random() - 0.5) * chaos * 0.5 * this.config.intensity;
 
-      // 邊界循環
+      // 節拍時粒子爆發
+      if (this.beatDetector.isBeat && Math.random() > 0.7) {
+        positions[i3] += (Math.random() - 0.5) * beat * 10;
+        positions[i3 + 1] += (Math.random() - 0.5) * beat * 10;
+        positions[i3 + 2] += (Math.random() - 0.5) * beat * 5;
+      }
+
+      // 邊界
       if (Math.abs(positions[i3]) > 50) positions[i3] *= -0.9;
       if (Math.abs(positions[i3 + 1]) > 50) positions[i3 + 1] *= -0.9;
       if (Math.abs(positions[i3 + 2]) > 30) positions[i3 + 2] *= -0.9;
@@ -328,9 +515,9 @@ const Visualizer = {
 
     this.geometry.attributes.position.needsUpdate = true;
 
-    // 相機晃動
-    this.camera.position.x = Math.sin(t * 2) * 3;
-    this.camera.position.y = Math.cos(t * 1.5) * 3;
+    // 相機晃動（受節拍影響）
+    this.camera.position.x = Math.sin(t * 2) * 3 * (1 + beat);
+    this.camera.position.y = Math.cos(t * 1.5) * 3 * (1 + beat);
     this.camera.position.z = 50;
     this.camera.lookAt(0, 0, 0);
   },
@@ -374,11 +561,22 @@ const Visualizer = {
       this.config[key] = value;
     }
   },
+
+  // --- 獲取節奏資料（供其他模組使用） ---
+  getRhythm() {
+    return {
+      bass: this.rhythm.bass,
+      mid: this.rhythm.mid,
+      treble: this.rhythm.treble,
+      overall: this.rhythm.overall,
+      isBeat: this.beatDetector.isBeat,
+      beatIntensity: this.beatDetector.beatIntensity,
+    };
+  },
 };
 
 // 初始化視覺化
 document.addEventListener('DOMContentLoaded', () => {
-  // 等 Three.js 載入
   if (typeof THREE !== 'undefined') {
     Visualizer.init();
   } else {
