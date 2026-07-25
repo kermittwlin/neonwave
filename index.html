@@ -365,21 +365,28 @@
     </div>
   </div>
 
-  <!-- YouTube iframe 容器（隱藏） -->
-  <div id="youtube-player" style="position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;"></div>
+  <!-- YouTube iframe 容器（隱藏但需有尺寸） -->
+  <div id="youtube-player" style="position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1;"></div>
 
   <!-- Toast 通知 -->
   <div id="toast-container" aria-live="polite"></div>
 
-  <!-- 隱藏的 YouTube iframe API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- YouTube callback 必須在 iframe_api 之前宣告 -->
+  <script>window.onYouTubeIframeAPIReady=function(){window.__ytReady&&window.__ytReady()};</script>
+
+  <!-- 第三方套件 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <!-- 應用程式 -->
   <script src="js/app.js"></script>
   <script src="js/player.js"></script>
   <script src="js/search.js"></script>
   <script src="js/playlist.js"></script>
   <script src="js/visualizer.js"></script>
   <script src="js/controls.js"></script>
+
+  <!-- YouTube iframe API（最後載入） -->
+  <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

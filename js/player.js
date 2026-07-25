@@ -6,32 +6,53 @@ const Player = {
   ytPlayer: null,
   isReady: false,
 
-  // --- YouTube IFrame API Ready ---
-  onYouTubeIframeAPIReady() {
-    this.ytPlayer = new YT.Player('youtube-player', {
-      height: '1',
-      width: '1',
-      playerVars: {
-        autoplay: 0,
-        controls: 0,
-        disablekb: 1,
-        fs: 0,
-        iv_load_policy: 3,
-        modestbranding: 1,
-        playsinline: 1,
-        rel: 0,
-        showinfo: 0,
-      },
-      events: {
-        onReady: () => {
-          this.isReady = true;
-          this.ytPlayer.setVolume(App.state.volume * 100);
-          console.log('[NEONWAVE] YouTube player ready');
+  // --- 初始化 YouTube Player ---
+  initYouTube() {
+    // 使用預先宣告的全域回調
+    window.__ytReady = () => this.createPlayer();
+
+    // 如果 API 已經載入完成
+    if (window.YT && window.YT.Player) {
+      this.createPlayer();
+    }
+  },
+
+  createPlayer() {
+    const container = document.getElementById('youtube-player');
+    if (!container) {
+      console.error('[NEONWAVE] youtube-player container not found');
+      return;
+    }
+
+    try {
+      this.ytPlayer = new YT.Player('youtube-player', {
+        height: '1',
+        width: '1',
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          modestbranding: 1,
+          playsinline: 1,
+          rel: 0,
+          showinfo: 0,
         },
-        onStateChange: (e) => this.onStateChange(e),
-        onError: (e) => this.onError(e),
-      },
-    });
+        events: {
+          onReady: () => {
+            this.isReady = true;
+            this.ytPlayer.setVolume(App.state.volume * 100);
+            console.log('[NEONWAVE] YouTube player ready');
+            App.toast('YouTube 播放器已就緒');
+          },
+          onStateChange: (e) => this.onStateChange(e),
+          onError: (e) => this.onError(e),
+        },
+      });
+    } catch (err) {
+      console.error('[NEONWAVE] YouTube player init error:', err);
+    }
   },
 
   // --- 狀態變更 ---
@@ -54,25 +75,39 @@ const Player = {
         this.onTrackEnd();
         break;
       case YT.PlayerState.BUFFERING:
-        // 載入中
+        console.log('[NEONWAVE] Buffering...');
+        break;
+      case YT.PlayerState.CUED:
+        console.log('[NEONWAVE] Video cued');
         break;
     }
   },
 
   onError(event) {
-    console.error('[NEONWAVE] YouTube error:', event.data);
-    App.toast('播放錯誤，嘗試下一首', 'error');
-    setTimeout(() => this.next(), 1000);
+    const errors = {
+      2: '無效的影片 ID',
+      100: '影片不存在或已移除',
+      101: '嵌入功能已被禁止',
+      150: '嵌入功能已被禁止',
+    };
+    const msg = errors[event.data] || `播放錯誤 (${event.data})`;
+    console.error('[NEONWAVE] YouTube error:', msg);
+    App.toast(msg, 'error');
+
+    // 自動跳下一首
+    setTimeout(() => this.next(), 1500);
   },
 
   // --- 播放控制 ---
   play(videoId) {
-    if (!this.isReady) {
-      console.warn('[NEONWAVE] Player not ready');
+    if (!this.isReady || !this.ytPlayer) {
+      console.warn('[NEONWAVE] Player not ready, retrying in 1s...');
+      setTimeout(() => this.play(videoId), 1000);
       return;
     }
 
     if (videoId) {
+      console.log('[NEONWAVE] Loading video:', videoId);
       this.ytPlayer.loadVideoById(videoId);
     } else {
       this.ytPlayer.playVideo();
@@ -80,11 +115,14 @@ const Player = {
   },
 
   pause() {
-    if (this.isReady) this.ytPlayer.pauseVideo();
+    if (this.isReady && this.ytPlayer) this.ytPlayer.pauseVideo();
   },
 
   togglePlay() {
-    if (!App.state.currentTrack) return;
+    if (!App.state.currentTrack) {
+      App.toast('請先選擇一首音樂');
+      return;
+    }
 
     if (App.state.isPlaying) {
       this.pause();
@@ -94,7 +132,7 @@ const Player = {
   },
 
   stop() {
-    if (this.isReady) this.ytPlayer.stopVideo();
+    if (this.isReady && this.ytPlayer) this.ytPlayer.stopVideo();
     App.state.isPlaying = false;
     this.updateUI();
     this.stopProgressUpdate();
@@ -103,7 +141,10 @@ const Player = {
   // --- 上下首 ---
   next() {
     const queue = App.state.queue;
-    if (queue.length === 0) return;
+    if (queue.length === 0) {
+      App.toast('佇列為空');
+      return;
+    }
 
     let nextIndex;
     if (App.state.playMode === 'shuffle') {
@@ -119,6 +160,12 @@ const Player = {
   prev() {
     const queue = App.state.queue;
     if (queue.length === 0) return;
+
+    // 如果已播放超過 3 秒，重新播放目前歌曲
+    if (this.getCurrentTime() > 3) {
+      this.seekTo(0);
+      return;
+    }
 
     const currentIndex = queue.findIndex(t => t.id === App.state.currentTrack?.id);
     let prevIndex;
@@ -142,6 +189,12 @@ const Player = {
 
   // --- 播放歌曲 ---
   playTrack(track) {
+    if (!track || !track.id) {
+      console.error('[NEONWAVE] Invalid track:', track);
+      return;
+    }
+
+    console.log('[NEONWAVE] Playing track:', track.title, track.id);
     App.state.currentTrack = track;
     this.play(track.id);
     App.addRecent(track);
@@ -151,9 +204,17 @@ const Player = {
 
   // --- 添加到佇列 ---
   addToQueue(track) {
-    App.state.queue.push(track);
-    Playlist.updateQueueUI();
-    App.toast(`已添加: ${track.title}`);
+    if (!track || !track.id) return;
+
+    // 檢查是否已存在
+    const exists = App.state.queue.find(t => t.id === track.id);
+    if (!exists) {
+      App.state.queue.push(track);
+      Playlist.updateQueueUI();
+      App.toast(`已添加: ${track.title}`);
+    } else {
+      App.toast('已在佇列中');
+    }
   },
 
   // --- 從佇列移除 ---
@@ -180,11 +241,13 @@ const Player = {
 
   // --- 音量 ---
   setVolume(vol) {
-    if (this.isReady) this.ytPlayer.setVolume(vol * 100);
+    if (this.isReady && this.ytPlayer) {
+      this.ytPlayer.setVolume(vol * 100);
+    }
   },
 
   toggleMute() {
-    if (!this.isReady) return;
+    if (!this.isReady || !this.ytPlayer) return;
     if (this.ytPlayer.isMuted()) {
       this.ytPlayer.unMute();
       App.toast('取消靜音');
@@ -204,7 +267,7 @@ const Player = {
   },
 
   seekTo(percent) {
-    if (!this.isReady) return;
+    if (!this.isReady || !this.ytPlayer) return;
     const duration = this.getDuration();
     if (duration > 0) {
       this.ytPlayer.seekTo(duration * percent, true);
@@ -240,33 +303,36 @@ const Player = {
   // --- UI 更新 ---
   updateUI() {
     const playBtn = document.getElementById('btn-play');
-    const iconPlay = playBtn.querySelector('.icon-play');
-    const iconPause = playBtn.querySelector('.icon-pause');
+    const iconPlay = playBtn?.querySelector('.icon-play');
+    const iconPause = playBtn?.querySelector('.icon-pause');
 
     if (App.state.isPlaying) {
-      iconPlay.style.display = 'none';
-      iconPause.style.display = 'block';
-      playBtn.classList.add('playing');
+      if (iconPlay) iconPlay.style.display = 'none';
+      if (iconPause) iconPause.style.display = 'block';
+      playBtn?.classList.add('playing');
     } else {
-      iconPlay.style.display = 'block';
-      iconPause.style.display = 'none';
-      playBtn.classList.remove('playing');
+      if (iconPlay) iconPlay.style.display = 'block';
+      if (iconPause) iconPause.style.display = 'none';
+      playBtn?.classList.remove('playing');
     }
 
     // 更新歌曲資訊
     if (App.state.currentTrack) {
       const track = App.state.currentTrack;
-      document.getElementById('track-title').textContent = track.title;
-      document.getElementById('track-artist').textContent = track.artist || '未知藝術家';
-
+      const titleEl = document.getElementById('track-title');
+      const artistEl = document.getElementById('track-artist');
       const coverEl = document.getElementById('track-cover');
-      if (track.thumbnail) {
+
+      if (titleEl) titleEl.textContent = track.title;
+      if (artistEl) artistEl.textContent = track.artist || '未知藝術家';
+
+      if (coverEl && track.thumbnail) {
         coverEl.innerHTML = `<img src="${track.thumbnail}" alt="${track.title}">`;
         document.body.classList.add('has-album');
 
         // 更新專輯背景
         const albumBg = document.getElementById('album-bg');
-        albumBg.style.backgroundImage = `url(${track.thumbnail})`;
+        if (albumBg) albumBg.style.backgroundImage = `url(${track.thumbnail})`;
       }
 
       // 更新頁面標題
@@ -279,13 +345,13 @@ const Player = {
 
   updatePlayModeIcon() {
     const btn = document.getElementById('btn-playmode');
+    if (!btn) return;
+
     const modes = ['loop', 'shuffle', 'single'];
-    const labels = ['順序播放', '隨機播放', '單曲循環'];
+    const labels = { loop: '順序播放', shuffle: '隨機播放', single: '單曲循環' };
 
     const currentIndex = modes.indexOf(App.state.playMode);
-    const nextMode = modes[(currentIndex + 1) % modes.length];
-
-    btn.title = labels[(currentIndex + 1) % modes.length];
+    btn.title = labels[App.state.playMode];
     btn.className = 'ctrl-btn mode-' + App.state.playMode;
   },
 
@@ -308,37 +374,35 @@ const Player = {
   },
 };
 
-// 全域 YouTube API 回調
-window.onYouTubeIframeAPIReady = () => Player.onYouTubeIframeAPIReady();
-
-// --- 初始化事件 ---
+// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
+  Player.initYouTube();
+
   // 播放按鈕
-  document.getElementById('btn-play').addEventListener('click', () => Player.togglePlay());
-  document.getElementById('btn-next').addEventListener('click', () => Player.next());
-  document.getElementById('btn-prev').addEventListener('click', () => Player.prev());
-  document.getElementById('btn-playmode').addEventListener('click', () => Player.cyclePlayMode());
+  document.getElementById('btn-play')?.addEventListener('click', () => Player.togglePlay());
+  document.getElementById('btn-next')?.addEventListener('click', () => Player.next());
+  document.getElementById('btn-prev')?.addEventListener('click', () => Player.prev());
+  document.getElementById('btn-playmode')?.addEventListener('click', () => Player.cyclePlayMode());
 
   // 音量
-  document.getElementById('volume-slider').addEventListener('input', (e) => {
+  document.getElementById('volume-slider')?.addEventListener('input', (e) => {
     App.setVolume(parseFloat(e.target.value));
   });
 
   // 全螢幕
-  document.getElementById('btn-fullscreen').addEventListener('click', () => App.toggleFullscreen());
+  document.getElementById('btn-fullscreen')?.addEventListener('click', () => App.toggleFullscreen());
 
   // 佇列
-  document.getElementById('btn-mini-queue').addEventListener('click', () => {
+  document.getElementById('btn-mini-queue')?.addEventListener('click', () => {
     document.body.classList.toggle('panel-left-open');
-    // 切換到佇列標籤
     document.querySelectorAll('.panel-tabs .tab').forEach(t => t.classList.remove('active'));
-    document.querySelector('.panel-tabs .tab[data-tab="queue"]').classList.add('active');
+    document.querySelector('.panel-tabs .tab[data-tab="queue"]')?.classList.add('active');
     document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-    document.getElementById('tab-queue').classList.add('active');
+    document.getElementById('tab-queue')?.classList.add('active');
   });
 
-  document.getElementById('btn-shuffle-queue').addEventListener('click', () => Player.shuffleQueue());
-  document.getElementById('btn-clear-queue').addEventListener('click', () => {
+  document.getElementById('btn-shuffle-queue')?.addEventListener('click', () => Player.shuffleQueue());
+  document.getElementById('btn-clear-queue')?.addEventListener('click', () => {
     Player.clearQueue();
     App.toast('佇列已清空');
   });
@@ -347,23 +411,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressContainer = document.querySelector('.progress-container');
   let isDragging = false;
 
-  progressContainer.addEventListener('mousedown', (e) => {
-    isDragging = true;
-    updateProgressFromEvent(e);
-  });
+  if (progressContainer) {
+    progressContainer.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      updateProgressFromEvent(e);
+    });
 
-  document.addEventListener('mousemove', (e) => {
-    if (isDragging) updateProgressFromEvent(e);
-  });
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) updateProgressFromEvent(e);
+    });
 
-  document.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
 
-  function updateProgressFromEvent(e) {
-    const rect = progressContainer.getBoundingClientRect();
-    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    Player.seekTo(percent);
+    function updateProgressFromEvent(e) {
+      const rect = progressContainer.getBoundingClientRect();
+      const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      Player.seekTo(percent);
+    }
   }
 
   // 首頁卡片
@@ -382,12 +448,12 @@ document.addEventListener('DOMContentLoaded', () => {
         case 'playlists':
           document.body.classList.add('panel-left-open');
           document.querySelectorAll('.panel-tabs .tab').forEach(t => t.classList.remove('active'));
-          document.querySelector('.panel-tabs .tab[data-tab="playlists"]').classList.add('active');
+          document.querySelector('.panel-tabs .tab[data-tab="playlists"]')?.classList.add('active');
           document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-          document.getElementById('tab-playlists').classList.add('active');
+          document.getElementById('tab-playlists')?.classList.add('active');
           break;
         case 'search':
-          document.getElementById('search-input').focus();
+          document.getElementById('search-input')?.focus();
           break;
         case 'visuals':
           document.body.classList.add('panel-right-open');
@@ -397,9 +463,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 點讚按鈕
-  document.getElementById('btn-like').addEventListener('click', () => {
+  document.getElementById('btn-like')?.addEventListener('click', () => {
     if (!App.state.currentTrack) return;
     App.toast('已收藏');
-    document.getElementById('btn-like').classList.toggle('liked');
+    document.getElementById('btn-like')?.classList.toggle('liked');
   });
 });
