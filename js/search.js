@@ -365,7 +365,7 @@ const Search = {
   // --- 建立結果項目 HTML ---
   createResultItem(track) {
     const thumbnailHtml = track.thumbnail
-      ? `<img src="${track.thumbnail}" alt="${track.title}" loading="lazy">`
+      ? `<img src="${track.thumbnail}" alt="${track.title}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="cover-placeholder" style="display:none">♫</div>`
       : `<div class="cover-placeholder">♫</div>`;
 
     return `
