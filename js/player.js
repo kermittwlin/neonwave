@@ -203,6 +203,11 @@ const Player = {
     App.addRecent(track);
     this.updateUI();
     Playlist.updateQueueUI();
+
+    // 載入歌詞
+    if (typeof Lyrics !== 'undefined') {
+      Lyrics.loadForTrack(track);
+    }
   },
 
   // --- 添加到佇列 ---
@@ -472,18 +477,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-like')?.classList.toggle('liked');
   });
 
-  // 歌詞按鈕
-  document.getElementById('btn-lyrics')?.addEventListener('click', () => {
-    App.state.lyricsVisible = !App.state.lyricsVisible;
-    const lyricsDisplay = document.getElementById('lyrics-display');
-    if (lyricsDisplay) {
-      lyricsDisplay.classList.toggle('lyrics-hidden', !App.state.lyricsVisible);
-    }
-  });
+  // 歌詞按鈕（由 Lyrics 模組處理）
+  // document.getElementById('btn-lyrics')?.addEventListener('click', ...)
 
-  // 關閉歌詞按鈕
-  document.getElementById('btn-close-lyrics')?.addEventListener('click', () => {
-    App.state.lyricsVisible = false;
-    document.getElementById('lyrics-display')?.classList.add('lyrics-hidden');
-  });
+  // 關閉歌詞按鈕（由 Lyrics 模組處理）
+  // document.getElementById('btn-close-lyrics')?.addEventListener('click', ...)
 });
