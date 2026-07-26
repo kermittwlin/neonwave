@@ -141,7 +141,7 @@ const Player = {
     this.stopProgressUpdate();
   },
 
-  // --- 上下首 ---
+  // --- 上下首（帶交叉淡入淡出）---
   next() {
     const queue = App.state.queue;
     if (queue.length === 0) {
@@ -153,11 +153,11 @@ const Player = {
     if (App.state.playMode === 'shuffle') {
       nextIndex = Math.floor(Math.random() * queue.length);
     } else {
-      const currentIndex = queue.findIndex(t => t.id === App.state.currentTrack?.id);
+      const currentIndex = queue.findIndex(t => t.id === this.currentTrack?.id);
       nextIndex = (currentIndex + 1) % queue.length;
     }
 
-    this.playTrack(queue[nextIndex]);
+    this.crossfadeTo(queue[nextIndex]);
   },
 
   prev() {
@@ -170,7 +170,7 @@ const Player = {
       return;
     }
 
-    const currentIndex = queue.findIndex(t => t.id === App.state.currentTrack?.id);
+    const currentIndex = queue.findIndex(t => t.id === this.currentTrack?.id);
     let prevIndex;
     if (App.state.playMode === 'shuffle') {
       prevIndex = Math.floor(Math.random() * queue.length);
@@ -178,7 +178,50 @@ const Player = {
       prevIndex = (currentIndex - 1 + queue.length) % queue.length;
     }
 
-    this.playTrack(queue[prevIndex]);
+    this.crossfadeTo(queue[prevIndex]);
+  },
+
+  // --- 交叉淡入淡出 ---
+  crossfadeTo(track, duration = 1000) {
+    if (!track || !track.id) return;
+
+    const originalVolume = App.state.volume;
+    const steps = 20;
+    const stepTime = duration / steps;
+    let step = 0;
+
+    // 淡出
+    const fadeOut = setInterval(() => {
+      step++;
+      const newVol = originalVolume * (1 - step / steps);
+      this.setVolume(Math.max(0, newVol));
+
+      if (step >= steps) {
+        clearInterval(fadeOut);
+        // 切換歌曲
+        this.playTrack(track);
+        // 淡入
+        this.fadeIn(originalVolume, duration);
+      }
+    }, stepTime);
+  },
+
+  fadeIn(targetVolume, duration = 1000) {
+    const steps = 20;
+    const stepTime = duration / steps;
+    let step = 0;
+
+    this.setVolume(0);
+
+    const fadeIn = setInterval(() => {
+      step++;
+      const newVol = targetVolume * (step / steps);
+      this.setVolume(Math.min(targetVolume, newVol));
+
+      if (step >= steps) {
+        clearInterval(fadeIn);
+      }
+    }, stepTime);
   },
 
   onTrackEnd() {
