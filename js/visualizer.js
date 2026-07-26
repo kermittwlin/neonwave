@@ -226,6 +226,9 @@ const Visualizer = {
     const sizes = new Float32Array(count);
     const velocities = new Float32Array(count * 3);
 
+    // 儲存初始位置（供星雲漩渦等效果使用）
+    this.initialPositions = new Float32Array(count * 3);
+
     const color1 = new THREE.Color(this.config.colorPrimary);
     const color2 = new THREE.Color(this.config.colorSecondary);
 
@@ -236,6 +239,11 @@ const Visualizer = {
       positions[i3] = pos.x;
       positions[i3 + 1] = pos.y;
       positions[i3 + 2] = pos.z;
+
+      // 記錄初始位置
+      this.initialPositions[i3] = pos.x;
+      this.initialPositions[i3 + 1] = pos.y;
+      this.initialPositions[i3 + 2] = pos.z;
 
       const mixRatio = Math.random();
       const color = color1.clone().lerp(color2, mixRatio);
@@ -449,34 +457,34 @@ const Visualizer = {
 
   updateNebula(t) {
     const positions = this.geometry.attributes.position.array;
+    const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const mid = this.rhythm.mid;
     const beat = this.beatDetector.beatIntensity;
 
-    // 呼吸效果（基於時間，不累乘）
-    const breathe = 1 + Math.sin(t * 0.5) * 0.05 + beat * 0.15;
+    // 呼吸效果（基於時間）
+    const breathe = 1 + Math.sin(t * 0.5) * 0.08 + beat * 0.2;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
-      const angle = Math.atan2(positions[i3 + 1], positions[i3]);
-      let radius = Math.sqrt(positions[i3] ** 2 + positions[i3 + 1] ** 2);
+
+      // 從初始位置旋轉，避免累積誤差
+      const initAngle = Math.atan2(initPos[i3 + 1], initPos[i3]);
+      const initRadius = Math.sqrt(initPos[i3] ** 2 + initPos[i3 + 1] ** 2);
 
       // 旋轉速度受中音影響
       const rotSpeed = 0.005 + mid * 0.008;
-      const newAngle = angle + rotSpeed * this.config.intensity;
+      const newAngle = initAngle + t * rotSpeed * this.config.intensity;
 
-      // 限制半徑範圍
-      radius = Math.min(radius, 50);
-
-      // 套用呼吸效果到半徑
-      const finalRadius = radius * breathe;
+      // 套用呼吸效果
+      const finalRadius = initRadius * breathe;
       positions[i3] = finalRadius * Math.cos(newAngle);
       positions[i3 + 1] = finalRadius * Math.sin(newAngle);
 
-      // Z 軸：在固定範圍內波動，不累加
-      positions[i3 + 2] = Math.sin(t * 0.3 + i * 0.01) * 15;
+      // Z 軸：基於初始位置波動
+      positions[i3 + 2] = initPos[i3 + 2] + Math.sin(t * 0.3 + i * 0.01) * 10;
       if (this.beatDetector.isBeat) {
-        positions[i3 + 2] += (Math.random() - 0.5) * 5;
+        positions[i3 + 2] += (Math.random() - 0.5) * 3;
       }
     }
 
