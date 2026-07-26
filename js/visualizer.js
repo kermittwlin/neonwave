@@ -453,26 +453,30 @@ const Visualizer = {
     const mid = this.rhythm.mid;
     const beat = this.beatDetector.beatIntensity;
 
+    // 呼吸效果（基於時間，不累乘）
+    const breathe = 1 + Math.sin(t * 0.5) * 0.05 + beat * 0.15;
+
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const angle = Math.atan2(positions[i3 + 1], positions[i3]);
-      const radius = Math.sqrt(positions[i3] ** 2 + positions[i3 + 1] ** 2);
+      let radius = Math.sqrt(positions[i3] ** 2 + positions[i3 + 1] ** 2);
 
       // 旋轉速度受中音影響
       const rotSpeed = 0.005 + mid * 0.008;
       const newAngle = angle + rotSpeed * this.config.intensity;
-      positions[i3] = radius * Math.cos(newAngle);
-      positions[i3 + 1] = radius * Math.sin(newAngle);
 
-      // 呼吸效果（受低音影響）
-      const breathe = Math.sin(t * 0.5) * 0.02 + 1 + beat * 0.1;
-      positions[i3] *= breathe;
-      positions[i3 + 1] *= breathe;
+      // 限制半徑範圍
+      radius = Math.min(radius, 50);
 
-      // Z 軸波動
-      positions[i3 + 2] += Math.sin(t + i * 0.01) * 0.02 * this.config.intensity;
+      // 套用呼吸效果到半徑
+      const finalRadius = radius * breathe;
+      positions[i3] = finalRadius * Math.cos(newAngle);
+      positions[i3 + 1] = finalRadius * Math.sin(newAngle);
+
+      // Z 軸：在固定範圍內波動，不累加
+      positions[i3 + 2] = Math.sin(t * 0.3 + i * 0.01) * 15;
       if (this.beatDetector.isBeat) {
-        positions[i3 + 2] += (Math.random() - 0.5) * 2;
+        positions[i3 + 2] += (Math.random() - 0.5) * 5;
       }
     }
 
