@@ -1,17 +1,25 @@
 /* ============================================
-   NEONWAVE — YouTube Player Module
+   NEONWAVE — Player Module (YouTube + Audio)
    ============================================ */
 
 const Player = {
   ytPlayer: null,
+  audioPlayer: null,
   isReady: false,
+  currentSource: 'youtube',
 
-  // --- 初始化 YouTube Player ---
+  // --- 初始化 ---
   initYouTube() {
-    // 使用預先宣告的全域回調
-    window.__ytReady = () => this.createPlayer();
+    // 建立 HTML5 Audio 播放器（供 Jamendo 等使用）
+    this.audioPlayer = new Audio();
+    this.audioPlayer.addEventListener('ended', () => this.onTrackEnd());
+    this.audioPlayer.addEventListener('error', (e) => {
+      console.error('[NEONWAVE] Audio error:', e);
+      App.toast('音訊播放失敗', 'error');
+    });
 
-    // 如果 API 已經載入完成
+    // YouTube Player
+    window.__ytReady = () => this.createPlayer();
     if (window.YT && window.YT.Player) {
       this.createPlayer();
     }
@@ -102,6 +110,18 @@ const Player = {
 
   // --- 播放控制 ---
   play(videoId) {
+    // 根據來源選擇播放方式
+    if (this.currentSource === 'jamendo') {
+      // Jamendo 使用 HTML5 Audio
+      if (this.audioPlayer && videoId) {
+        this.audioPlayer.play().catch(err => {
+          console.error('[NEONWAVE] Audio play error:', err);
+        });
+      }
+      return;
+    }
+
+    // YouTube 播放
     if (!this.isReady || !this.ytPlayer) {
       console.warn('[NEONWAVE] Player not ready, retrying...');
       App.toast('播放器載入中...');
@@ -118,7 +138,11 @@ const Player = {
   },
 
   pause() {
-    if (this.isReady && this.ytPlayer) this.ytPlayer.pauseVideo();
+    if (this.currentSource === 'jamendo') {
+      if (this.audioPlayer) this.audioPlayer.pause();
+    } else {
+      if (this.isReady && this.ytPlayer) this.ytPlayer.pauseVideo();
+    }
   },
 
   togglePlay() {
@@ -242,7 +266,20 @@ const Player = {
 
     console.log('[NEONWAVE] Playing track:', track.title, track.id);
     App.state.currentTrack = track;
-    this.play(track.id);
+
+    // 根據來源設定播放器
+    if (track.source === 'jamendo' && track.streamUrl) {
+      this.currentSource = 'jamendo';
+      this.audioPlayer.src = track.streamUrl;
+      this.audioPlayer.load();
+      this.audioPlayer.play().catch(err => {
+        console.error('[NEONWAVE] Jamendo play error:', err);
+      });
+    } else {
+      this.currentSource = 'youtube';
+      this.play(track.id);
+    }
+
     App.addRecent(track);
     this.updateUI();
     Playlist.updateQueueUI();
@@ -292,35 +329,53 @@ const Player = {
 
   // --- 音量 ---
   setVolume(vol) {
-    if (this.isReady && this.ytPlayer) {
+    if (this.currentSource === 'jamendo' && this.audioPlayer) {
+      this.audioPlayer.volume = vol;
+    } else if (this.isReady && this.ytPlayer) {
       this.ytPlayer.setVolume(vol * 100);
     }
   },
 
   toggleMute() {
-    if (!this.isReady || !this.ytPlayer) return;
-    if (this.ytPlayer.isMuted()) {
-      this.ytPlayer.unMute();
-      App.toast('取消靜音');
+    if (this.currentSource === 'jamendo') {
+      if (this.audioPlayer) {
+        this.audioPlayer.muted = !this.audioPlayer.muted;
+        App.toast(this.audioPlayer.muted ? '已靜音' : '取消靜音');
+      }
     } else {
-      this.ytPlayer.mute();
-      App.toast('已靜音');
+      if (!this.isReady || !this.ytPlayer) return;
+      if (this.ytPlayer.isMuted()) {
+        this.ytPlayer.unMute();
+        App.toast('取消靜音');
+      } else {
+        this.ytPlayer.mute();
+        App.toast('已靜音');
+      }
     }
   },
 
   // --- 進度 ---
   getCurrentTime() {
+    if (this.currentSource === 'jamendo' && this.audioPlayer) {
+      return this.audioPlayer.currentTime || 0;
+    }
     return this.ytPlayer?.getCurrentTime() || 0;
   },
 
   getDuration() {
+    if (this.currentSource === 'jamendo' && this.audioPlayer) {
+      return this.audioPlayer.duration || 0;
+    }
     return this.ytPlayer?.getDuration() || 0;
   },
 
   seekTo(percent) {
-    if (!this.isReady || !this.ytPlayer) return;
     const duration = this.getDuration();
-    if (duration > 0) {
+    if (duration <= 0) return;
+
+    if (this.currentSource === 'jamendo' && this.audioPlayer) {
+      this.audioPlayer.currentTime = duration * percent;
+    } else if (this.isReady && this.ytPlayer) {
       this.ytPlayer.seekTo(duration * percent, true);
     }
   },

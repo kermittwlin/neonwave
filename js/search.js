@@ -17,6 +17,16 @@ const Search = {
     const results = document.getElementById('search-results');
     const clearBtn = document.getElementById('search-clear');
     const submitBtn = document.getElementById('search-submit');
+    const sourceSelect = document.getElementById('source-select');
+
+    // 來源選擇器
+    if (sourceSelect) {
+      sourceSelect.value = SourceManager?.currentSource || 'youtube';
+      sourceSelect.addEventListener('change', () => {
+        SourceManager?.setSource(sourceSelect.value);
+        App.toast(`已切換至 ${sourceSelect.options[sourceSelect.selectedIndex].text}`);
+      });
+    }
 
     // 搜尋輸入
     input.addEventListener('input', () => {
@@ -164,11 +174,14 @@ const Search = {
     if (!query || query.length < 2) return;
     if (this.isLoading) return;
 
-    // 檢查是否為 YouTube URL
-    const videoId = this.extractYouTubeId(query);
-    if (videoId) {
-      this.handleYouTubeUrl(videoId);
-      return;
+    // 檢查是否為 YouTube URL（只有 YouTube 來源才處理）
+    const source = SourceManager?.currentSource || 'youtube';
+    if (source === 'youtube') {
+      const videoId = this.extractYouTubeId(query);
+      if (videoId) {
+        this.handleYouTubeUrl(videoId);
+        return;
+      }
     }
 
     // 加入搜尋歷史
@@ -187,8 +200,14 @@ const Search = {
     }
 
     try {
-      const data = await this.searchYouTube(query, loadMore);
-      if (loadMore) {
+      let data;
+      if (source === 'jamendo') {
+        data = await JamendoSource.search(query);
+      } else {
+        data = await this.searchYouTube(query, loadMore);
+      }
+
+      if (loadMore && source !== 'jamendo') {
         this.appendResults(data.tracks);
       } else {
         this.displayResults(data.tracks);
