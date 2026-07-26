@@ -9,6 +9,8 @@ const Search = {
   apiKey: localStorage.getItem('neonwave-yt-apikey') || 'AIzaSyAk69vBCPQPZpHX1SQd_rK4rwe8MAn21No',
   nextPageToken: '',
   currentQuery: '',
+  history: JSON.parse(localStorage.getItem('neonwave-search-history') || '[]'),
+  maxHistory: 10,
 
   init() {
     const input = document.getElementById('search-input');
@@ -22,7 +24,14 @@ const Search = {
       if (input.value.length >= 2) {
         this.debounceSearch(input.value);
       } else if (input.value.length === 0) {
-        results.classList.remove('visible');
+        this.showHistory();
+      }
+    });
+
+    // 聚焦時顯示歷史
+    input.addEventListener('focus', () => {
+      if (!input.value) {
+        this.showHistory();
       }
     });
 
@@ -30,7 +39,7 @@ const Search = {
     clearBtn.addEventListener('click', () => {
       input.value = '';
       clearBtn.style.display = 'none';
-      results.classList.remove('visible');
+      this.showHistory();
       input.focus();
     });
 
@@ -79,6 +88,70 @@ const Search = {
     App.toast('YouTube API Key 已設定');
   },
 
+  // --- 搜尋歷史管理 ---
+  addToHistory(query) {
+    if (!query || query.length < 2) return;
+
+    // 移除重複
+    this.history = this.history.filter(h => h !== query);
+    // 加到最前面
+    this.history.unshift(query);
+    // 限制數量
+    if (this.history.length > this.maxHistory) {
+      this.history = this.history.slice(0, this.maxHistory);
+    }
+    localStorage.setItem('neonwave-search-history', JSON.stringify(this.history));
+  },
+
+  clearHistory() {
+    this.history = [];
+    localStorage.removeItem('neonwave-search-history');
+    App.toast('搜尋歷史已清除');
+  },
+
+  showHistory() {
+    const results = document.getElementById('search-results');
+    if (!results || this.history.length === 0) {
+      if (results) results.classList.remove('visible');
+      return;
+    }
+
+    const html = `
+      <div class="search-history">
+        <div class="history-header">
+          <span>最近搜尋</span>
+          <button class="btn-ghost small" id="btn-clear-history">清除</button>
+        </div>
+        ${this.history.map(query => `
+          <div class="history-item" data-query="${this.escapeHtml(query)}">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+            </svg>
+            <span>${this.escapeHtml(query)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    results.innerHTML = html;
+    results.classList.add('visible');
+
+    // 綁定事件
+    results.querySelectorAll('.history-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const query = item.dataset.query;
+        document.getElementById('search-input').value = query;
+        this.search(query);
+      });
+    });
+
+    document.getElementById('btn-clear-history')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.clearHistory();
+      results.classList.remove('visible');
+    });
+  },
+
   // --- 防抖搜尋 ---
   searchTimeout: null,
   debounceSearch(query) {
@@ -96,6 +169,11 @@ const Search = {
     if (videoId) {
       this.handleYouTubeUrl(videoId);
       return;
+    }
+
+    // 加入搜尋歷史
+    if (!loadMore) {
+      this.addToHistory(query);
     }
 
     this.isLoading = true;

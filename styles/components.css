@@ -458,3 +458,41 @@ body.immersive:hover #search-area {
   color: var(--text-primary);
   word-break: break-all;
 }
+
+/* --- 搜尋歷史 --- */
+.search-history {
+  padding: 8px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.history-item svg {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
