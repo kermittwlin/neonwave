@@ -30,7 +30,12 @@ const Controls = {
     // 發光強度
     this.bindSlider('fx-glow', (value) => {
       Visualizer.updateConfig('glow', value);
-      document.body.style.setProperty('--glow-intensity', value);
+      // 值大於 0.5 時啟用溢光效果
+      document.body.classList.toggle('glow-on', value > 0.5);
+      // 同時調整粒子透明度
+      if (Visualizer.material) {
+        Visualizer.material.opacity = 0.6 + value * 0.2;
+      }
     });
   },
 
