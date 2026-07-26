@@ -462,30 +462,30 @@ const Visualizer = {
     const mid = this.rhythm.mid;
     const beat = this.beatDetector.beatIntensity;
 
-    // 呼吸效果（基於時間）
-    const breathe = 1 + Math.sin(t * 0.5) * 0.08 + beat * 0.2;
-
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 從初始位置旋轉，避免累積誤差
-      const initAngle = Math.atan2(initPos[i3 + 1], initPos[i3]);
-      const initRadius = Math.sqrt(initPos[i3] ** 2 + initPos[i3 + 1] ** 2);
+      // 從初始位置讀取半徑和角度
+      const initX = initPos[i3];
+      const initY = initPos[i3 + 1];
+      const initAngle = Math.atan2(initY, initX);
+      const initRadius = Math.sqrt(initX * initX + initY * initY);
 
-      // 旋轉速度受中音影響
-      const rotSpeed = 0.005 + mid * 0.008;
+      // 差異旋轉：內圈快、外圈慢（像星系）
+      const speedFactor = 1 / (1 + initRadius * 0.03);
+      const rotSpeed = (0.02 + mid * 0.01) * speedFactor;
       const newAngle = initAngle + t * rotSpeed * this.config.intensity;
 
-      // 套用呼吸效果
-      const finalRadius = initRadius * breathe;
+      // 呼吸效果：內圈幅度大、外圈幅度小
+      const breatheAmount = (1 - initRadius / 50) * 0.15 + beat * 0.1;
+      const finalRadius = initRadius * (1 + Math.sin(t * 0.8) * breatheAmount);
+
+      // 設定位置
       positions[i3] = finalRadius * Math.cos(newAngle);
       positions[i3 + 1] = finalRadius * Math.sin(newAngle);
 
-      // Z 軸：基於初始位置波動
-      positions[i3 + 2] = initPos[i3 + 2] + Math.sin(t * 0.3 + i * 0.01) * 10;
-      if (this.beatDetector.isBeat) {
-        positions[i3 + 2] += (Math.random() - 0.5) * 3;
-      }
+      // Z 軸：輕微波動
+      positions[i3 + 2] = initPos[i3 + 2] * 0.5 + Math.sin(t * 0.4 + initAngle * 2) * 5;
     }
 
     this.geometry.attributes.position.needsUpdate = true;
