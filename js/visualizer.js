@@ -58,46 +58,20 @@ const Visualizer = {
     const canvas = document.getElementById('visualizer-canvas');
     if (!canvas) return;
 
-    // 場景
     this.scene = new THREE.Scene();
-
-    // 相機
-    this.camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.z = 50;
 
-    // 渲染器
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: canvas,
-      alpha: true,
-      antialias: true,
-    });
+    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // 時鐘
     this.clock = new THREE.Clock();
 
-    // 初始化音訊分析
-    this.initAudio();
-
-    // 初始化預設
     this.initPresets();
-
-    // 建立粒子
     this.createParticles(this.currentPreset);
 
-    // 事件
     window.addEventListener('resize', () => this.onResize());
-
-    // 監聽播放狀態
-    this.startPlaybackMonitor();
-
-    // 開始渲染
     this.animate();
   },
 
@@ -113,18 +87,6 @@ const Visualizer = {
     } catch (e) {
       console.warn('[NEONWAVE] Web Audio API not supported, using simulated beats');
     }
-  },
-
-  // --- 監聽播放狀態 ---
-  startPlaybackMonitor() {
-    setInterval(() => {
-      this.rhythm.isPlaying = App?.state?.isPlaying || false;
-      if (this.rhythm.isPlaying && this.analyser) {
-        this.analyzeAudio();
-      } else {
-        this.simulateBeats();
-      }
-    }, 50);
   },
 
   // --- 分析音訊 ---
@@ -180,33 +142,6 @@ const Visualizer = {
     } else {
       this.beatDetector.isBeat = false;
       this.beatDetector.beatIntensity *= 0.9;
-    }
-  },
-
-  // --- 模擬節拍（無音訊時） ---
-  simulateBeats() {
-    const now = performance.now();
-    const time = now / 1000;
-
-    // 使用多個正弦波組合模擬音樂節奏
-    const wave1 = Math.sin(time * 2.1) * 0.5 + 0.5;
-    const wave2 = Math.sin(time * 3.7) * 0.3 + 0.3;
-    const wave3 = Math.sin(time * 5.3) * 0.2 + 0.2;
-    const combined = (wave1 + wave2 + wave3) / 3;
-
-    this.rhythm.bass = combined;
-    this.rhythm.mid = combined * 0.8;
-    this.rhythm.treble = combined * 0.6;
-    this.rhythm.overall = combined * 0.7;
-
-    // 模擬節拍
-    const beatPhase = (time * 2.2) % 1;
-    if (beatPhase < 0.1) {
-      this.beatDetector.isBeat = true;
-      this.beatDetector.beatIntensity = 0.8 + Math.random() * 0.2;
-    } else {
-      this.beatDetector.isBeat = false;
-      this.beatDetector.beatIntensity *= 0.92;
     }
   },
 
@@ -348,28 +283,24 @@ const Visualizer = {
 
     const elapsed = this.clock.getElapsedTime();
 
+    // 在動畫迴圈內更新節奏（避免 setInterval 干擾）
+    this.updateRhythm(elapsed);
+
     if (this.particles) {
-      // 節奏數據
       const bass = this.rhythm.bass;
       const beat = this.beatDetector.beatIntensity;
       const isBeat = this.beatDetector.isBeat;
 
-      // 執行當前預設的更新（傳入原始時間，各預設自行乘以 speed）
       const preset = this.presets[this.currentPreset];
       if (preset && preset.update) {
         preset.update(elapsed);
       }
 
-      // 節奏反應：粒子大小
       if (this.config.beatReactive) {
         const baseSize = 0.5 * this.config.size;
-        const beatSize = isBeat ? baseSize * (1 + beat * 0.8) : baseSize;
-        this.material.size = beatSize;
-
-        // 節奏反應：透明度
+        this.material.size = isBeat ? baseSize * (1 + beat * 0.8) : baseSize;
         this.material.opacity = 0.6 + bass * 0.4;
 
-        // 節奏反應：相機晃動
         if (isBeat) {
           this.camera.position.x += (Math.random() - 0.5) * beat * 0.5;
           this.camera.position.y += (Math.random() - 0.5) * beat * 0.5;
@@ -378,6 +309,33 @@ const Visualizer = {
     }
 
     this.renderer.render(this.scene, this.camera);
+  },
+
+  // --- 節奏更新 ---
+  updateRhythm(t) {
+    if (App?.state?.isPlaying && this.analyser) {
+      this.analyzeAudio();
+    } else {
+      // 模擬節拍
+      const wave1 = Math.sin(t * 2.1) * 0.5 + 0.5;
+      const wave2 = Math.sin(t * 3.7) * 0.3 + 0.3;
+      const wave3 = Math.sin(t * 5.3) * 0.2 + 0.2;
+      const combined = (wave1 + wave2 + wave3) / 3;
+
+      this.rhythm.bass = combined;
+      this.rhythm.mid = combined * 0.8;
+      this.rhythm.treble = combined * 0.6;
+      this.rhythm.overall = combined * 0.7;
+
+      const beatPhase = (t * 2.2) % 1;
+      if (beatPhase < 0.1) {
+        this.beatDetector.isBeat = true;
+        this.beatDetector.beatIntensity = 0.8 + Math.random() * 0.2;
+      } else {
+        this.beatDetector.isBeat = false;
+        this.beatDetector.beatIntensity *= 0.92;
+      }
+    }
   },
 
   // --- 預設更新函數（加入節奏反應） ---
