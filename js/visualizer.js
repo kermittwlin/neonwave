@@ -307,15 +307,16 @@ const Visualizer = {
   animate() {
     requestAnimationFrame(() => this.animate());
 
-    const elapsed = this.clock.getElapsedTime() * this.config.speed;
+    const delta = this.clock.getDelta() * this.config.speed;
+    this.elapsed = (this.elapsed || 0) + delta;
 
-    // 更新節奏數據
-    this.updateRhythm(elapsed);
+    // 更新節奏數據（用總時間）
+    this.updateRhythm(this.elapsed);
 
     if (this.particles) {
       const preset = this.presets[this.currentPreset];
       if (preset && preset.update) {
-        preset.update(elapsed);
+        preset.update(delta);
       }
       this.material.size = 0.5 * this.config.size;
     }
@@ -324,25 +325,28 @@ const Visualizer = {
   },
 
   // --- 霓虹螺旋：bass 加速旋轉，treble 增大螺旋幅度 ---
-  updateSpiral(t) {
+  updateSpiral(delta) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
     const { bass, treble } = this.rhythm;
+    const t = this.elapsed;
+
+    // 旋轉角度增量（每帧）
+    const rotSpeed = 0.5 * (1 + bass * 0.3) * intensity;
+    this._spiralAngle = (this._spiralAngle || 0) + delta * rotSpeed;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const ratio = i / count;
 
-      // 基礎旋轉，bass 微調速度
-      const angle = t * 0.5 * (1 + bass * 0.3) + ratio * Math.PI * 2;
-      // treble 微調螺旋半徑
+      const angle = this._spiralAngle + ratio * Math.PI * 2;
       const spiralRadius = (10 + ratio * 30) * (1 + treble * 0.2);
 
-      positions[i3] = initPos[i3] + Math.sin(angle) * spiralRadius * 0.3 * intensity;
-      positions[i3 + 1] = initPos[i3 + 1] + Math.cos(angle) * spiralRadius * 0.3 * intensity;
-      positions[i3 + 2] = initPos[i3 + 2] + Math.sin(t * 0.3 + ratio * 5) * 5 * intensity;
+      positions[i3] = initPos[i3] + Math.sin(angle) * spiralRadius * 0.3;
+      positions[i3 + 1] = initPos[i3 + 1] + Math.cos(angle) * spiralRadius * 0.3;
+      positions[i3 + 2] = initPos[i3 + 2] + Math.sin(t * 0.3 + ratio * 5) * 5;
     }
 
     this.geometry.attributes.position.needsUpdate = true;
@@ -353,20 +357,21 @@ const Visualizer = {
   },
 
   // --- 矩陣雨：bass 加速下落 ---
-  updateMatrixRain(t) {
+  updateMatrixRain(delta) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
     const { bass } = this.rhythm;
 
-    // bass 加速下落
-    const fallSpeed = 30 * (1 + bass * 0.5);
+    // 下落增量（每帧）
+    const fallSpeed = 30 * (1 + bass * 0.5) * intensity;
+    this._rainOffset = (this._rainOffset || 0) + delta * fallSpeed;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      const fallOffset = (t * fallSpeed * intensity) % 100;
+      const fallOffset = (this._rainOffset + i * 0.1) % 100;
       let newY = initPos[i3 + 1] - fallOffset;
 
       if (newY < -50) {
@@ -387,12 +392,13 @@ const Visualizer = {
   },
 
   // --- 星雲漩渦：bass 呼吸，mid 旋轉 ---
-  updateNebula(t) {
+  updateNebula(delta) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
     const { bass, mid } = this.rhythm;
+    const t = this.elapsed;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
@@ -402,11 +408,16 @@ const Visualizer = {
       const initAngle = Math.atan2(initY, initX);
       const initRadius = Math.sqrt(initX * initX + initY * initY);
 
-      // mid 微調旋轉速度
+      // 旋轉增量（每帧），內圈快、外圈慢
       const speedFactor = 1 / (1 + initRadius * 0.02);
-      const newAngle = initAngle + t * 0.5 * speedFactor * intensity * (1 + mid * 0.3);
+      const rotDelta = delta * 0.5 * speedFactor * intensity * (1 + mid * 0.3);
 
-      // bass 微調呼吸幅度
+      // 儲存每個粒子的旋轉角度
+      if (!this._nebulaAngles) this._nebulaAngles = new Float32Array(count);
+      this._nebulaAngles[i] += rotDelta;
+      const newAngle = initAngle + this._nebulaAngles[i];
+
+      // 呼吸效果
       const breathe = 1 + Math.sin(t * 0.5) * (0.1 + bass * 0.15);
       const finalRadius = initRadius * breathe;
 
@@ -424,20 +435,21 @@ const Visualizer = {
   },
 
   // --- 粒子風暴：mid 增加混亂度，treble 增加跳動 ---
-  updateStorm(t) {
+  updateStorm(delta) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
     const { mid, treble } = this.rhythm;
+    const t = this.elapsed;
 
-    // mid 增加混亂幅度，treble 增加跳動頻率
     const chaos = 1 + mid * 0.5;
     const jitter = 1 + treble * 0.4;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
+      // 用總時間做 sin/cos（頻率固定，不會加速）
       const offsetX = Math.sin(t * 2.1 * jitter + i * 0.1) * 15 * intensity * chaos;
       const offsetY = Math.cos(t * 1.7 * jitter + i * 0.13) * 15 * intensity * chaos;
       const offsetZ = Math.sin(t * 1.3 * jitter + i * 0.17) * 10 * intensity * chaos;
