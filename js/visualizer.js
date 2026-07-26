@@ -11,8 +11,15 @@ const Visualizer = {
   material: null,
   clock: null,
   presets: {},
-  currentPreset: 'neonSpiral',
+  currentPreset: 'nebulaSwirl',
   initialPositions: null,
+
+  // 節奏數據
+  rhythm: {
+    bass: 0,
+    mid: 0,
+    treble: 0,
+  },
 
   config: {
     particleCount: 2000,
@@ -51,6 +58,18 @@ const Visualizer = {
     this.animate();
   },
 
+  // --- 節奏更新（模擬模式）---
+  updateRhythm(t) {
+    // 三個正弦波組合，模擬音樂節奏
+    const wave1 = Math.sin(t * 2.1) * 0.5 + 0.5;
+    const wave2 = Math.sin(t * 3.7) * 0.3 + 0.3;
+    const wave3 = Math.sin(t * 5.3) * 0.2 + 0.2;
+
+    this.rhythm.bass = wave1;
+    this.rhythm.mid = wave2;
+    this.rhythm.treble = wave3;
+  },
+
   // --- 粒子系統 ---
   createParticles(preset) {
     if (this.particles) {
@@ -66,7 +85,6 @@ const Visualizer = {
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
 
-    // 儲存初始位置
     this.initialPositions = new Float32Array(count * 3);
 
     const color1 = new THREE.Color(this.config.colorPrimary);
@@ -179,6 +197,9 @@ const Visualizer = {
 
     const elapsed = this.clock.getElapsedTime() * this.config.speed;
 
+    // 更新節奏數據
+    this.updateRhythm(elapsed);
+
     if (this.particles) {
       const preset = this.presets[this.currentPreset];
       if (preset && preset.update) {
@@ -190,20 +211,22 @@ const Visualizer = {
     this.renderer.render(this.scene, this.camera);
   },
 
-  // --- 霓虹螺旋：粒子沿螺旋線旋轉移動 ---
+  // --- 霓虹螺旋：bass 加速旋轉，treble 增大螺旋幅度 ---
   updateSpiral(t) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
+    const { bass, treble } = this.rhythm;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const ratio = i / count;
 
-      // 基於初始位置 + 時間偏移
-      const angle = t * 0.5 + ratio * Math.PI * 2;
-      const spiralRadius = 10 + ratio * 30;
+      // 基礎旋轉，bass 微調速度
+      const angle = t * 0.5 * (1 + bass * 0.3) + ratio * Math.PI * 2;
+      // treble 微調螺旋半徑
+      const spiralRadius = (10 + ratio * 30) * (1 + treble * 0.2);
 
       positions[i3] = initPos[i3] + Math.sin(angle) * spiralRadius * 0.3 * intensity;
       positions[i3 + 1] = initPos[i3 + 1] + Math.cos(angle) * spiralRadius * 0.3 * intensity;
@@ -217,21 +240,23 @@ const Visualizer = {
     this.camera.lookAt(0, 0, 0);
   },
 
-  // --- 矩陣雨：粒子從上往下流動 ---
+  // --- 矩陣雨：bass 加速下落 ---
   updateMatrixRain(t) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
+    const { bass } = this.rhythm;
+
+    // bass 加速下落
+    const fallSpeed = 30 * (1 + bass * 0.5);
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 從初始 Y 位置向下流動，循環重複
-      const fallOffset = (t * 30 * intensity) % 100;
+      const fallOffset = (t * fallSpeed * intensity) % 100;
       let newY = initPos[i3 + 1] - fallOffset;
 
-      // 循環：低於 -50 時回到上方
       if (newY < -50) {
         newY += 100;
       }
@@ -249,28 +274,28 @@ const Visualizer = {
     this.camera.lookAt(0, 0, 0);
   },
 
-  // --- 星雲漩渦：粒子繞中心旋轉 ---
+  // --- 星雲漩渦：bass 呼吸，mid 旋轉 ---
   updateNebula(t) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
+    const { bass, mid } = this.rhythm;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 從初始位置計算極座標
       const initX = initPos[i3];
       const initY = initPos[i3 + 1];
       const initAngle = Math.atan2(initY, initX);
       const initRadius = Math.sqrt(initX * initX + initY * initY);
 
-      // 旋轉：內圈快、外圈慢
+      // mid 微調旋轉速度
       const speedFactor = 1 / (1 + initRadius * 0.02);
-      const newAngle = initAngle + t * 0.5 * speedFactor * intensity;
+      const newAngle = initAngle + t * 0.5 * speedFactor * intensity * (1 + mid * 0.3);
 
-      // 呼吸效果
-      const breathe = 1 + Math.sin(t * 0.5) * 0.1;
+      // bass 微調呼吸幅度
+      const breathe = 1 + Math.sin(t * 0.5) * (0.1 + bass * 0.15);
       const finalRadius = initRadius * breathe;
 
       positions[i3] = finalRadius * Math.cos(newAngle);
@@ -286,20 +311,24 @@ const Visualizer = {
     this.camera.lookAt(0, 0, 0);
   },
 
-  // --- 粒子風暴：粒子隨機亂舞 ---
+  // --- 粒子風暴：mid 增加混亂度，treble 增加跳動 ---
   updateStorm(t) {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
     const intensity = this.config.intensity;
+    const { mid, treble } = this.rhythm;
+
+    // mid 增加混亂幅度，treble 增加跳動頻率
+    const chaos = 1 + mid * 0.5;
+    const jitter = 1 + treble * 0.4;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 基於初始位置 + 時間驅動的隨機偏移
-      const offsetX = Math.sin(t * 2.1 + i * 0.1) * 15 * intensity;
-      const offsetY = Math.cos(t * 1.7 + i * 0.13) * 15 * intensity;
-      const offsetZ = Math.sin(t * 1.3 + i * 0.17) * 10 * intensity;
+      const offsetX = Math.sin(t * 2.1 * jitter + i * 0.1) * 15 * intensity * chaos;
+      const offsetY = Math.cos(t * 1.7 * jitter + i * 0.13) * 15 * intensity * chaos;
+      const offsetZ = Math.sin(t * 1.3 * jitter + i * 0.17) * 10 * intensity * chaos;
 
       positions[i3] = initPos[i3] + offsetX;
       positions[i3 + 1] = initPos[i3 + 1] + offsetY;
