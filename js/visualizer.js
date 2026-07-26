@@ -21,6 +21,15 @@ const Visualizer = {
     treble: 0,
   },
 
+  // 音訊擷取
+  audioCapture: {
+    active: false,
+    audioContext: null,
+    analyser: null,
+    dataArray: null,
+    source: null,
+  },
+
   config: {
     particleCount: 2000,
     intensity: 1,
@@ -58,16 +67,119 @@ const Visualizer = {
     this.animate();
   },
 
-  // --- 節奏更新（模擬模式）---
+  // --- 節奏更新 ---
   updateRhythm(t) {
-    // 三個正弦波組合，模擬音樂節奏
-    const wave1 = Math.sin(t * 2.1) * 0.5 + 0.5;
-    const wave2 = Math.sin(t * 3.7) * 0.3 + 0.3;
-    const wave3 = Math.sin(t * 5.3) * 0.2 + 0.2;
+    if (this.audioCapture.active && this.audioCapture.analyser) {
+      this.analyzeAudio();
+    } else {
+      const wave1 = Math.sin(t * 2.1) * 0.5 + 0.5;
+      const wave2 = Math.sin(t * 3.7) * 0.3 + 0.3;
+      const wave3 = Math.sin(t * 5.3) * 0.2 + 0.2;
 
-    this.rhythm.bass = wave1;
-    this.rhythm.mid = wave2;
-    this.rhythm.treble = wave3;
+      this.rhythm.bass = wave1;
+      this.rhythm.mid = wave2;
+      this.rhythm.treble = wave3;
+    }
+  },
+
+  // --- 分析真實音訊 ---
+  analyzeAudio() {
+    const { analyser, dataArray } = this.audioCapture;
+    if (!analyser || !dataArray) return;
+
+    analyser.getByteFrequencyData(dataArray);
+
+    const len = dataArray.length;
+    let bassSum = 0, midSum = 0, trebleSum = 0;
+
+    for (let i = 0; i < len; i++) {
+      const val = dataArray[i] / 255;
+      if (i < len * 0.15) {
+        bassSum += val;
+      } else if (i < len * 0.5) {
+        midSum += val;
+      } else {
+        trebleSum += val;
+      }
+    }
+
+    this.rhythm.bass = bassSum / (len * 0.15);
+    this.rhythm.mid = midSum / (len * 0.35);
+    this.rhythm.treble = trebleSum / (len * 0.5);
+  },
+
+  // --- 啟動音訊擷取 ---
+  async startAudioCapture() {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: false,
+        audio: true,
+      });
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+
+      source.connect(analyser);
+
+      this.audioCapture = {
+        active: true,
+        audioContext,
+        analyser,
+        dataArray: new Uint8Array(analyser.frequencyBinCount),
+        source,
+        stream,
+      };
+
+      stream.getAudioTracks()[0].onended = () => this.stopAudioCapture();
+
+      App.toast('音訊感應已啟動');
+      this.updateCaptureBtn(true);
+      console.log('[NEONWAVE] Audio capture started');
+
+    } catch (err) {
+      console.warn('[NEONWAVE] Audio capture failed:', err);
+      App.toast('音訊擷取被取消或不支援');
+    }
+  },
+
+  // --- 停止音訊擷取 ---
+  stopAudioCapture() {
+    if (this.audioCapture.stream) {
+      this.audioCapture.stream.getTracks().forEach(t => t.stop());
+    }
+    if (this.audioCapture.audioContext) {
+      this.audioCapture.audioContext.close();
+    }
+    this.audioCapture = {
+      active: false,
+      audioContext: null,
+      analyser: null,
+      dataArray: null,
+      source: null,
+    };
+    App.toast('音訊感應已關閉');
+    this.updateCaptureBtn(false);
+  },
+
+  // --- 切換音訊擷取 ---
+  toggleAudioCapture() {
+    if (this.audioCapture.active) {
+      this.stopAudioCapture();
+    } else {
+      this.startAudioCapture();
+    }
+  },
+
+  // --- 更新擷取按鈕狀態 ---
+  updateCaptureBtn(active) {
+    const btn = document.getElementById('btn-audio-capture');
+    if (btn) {
+      btn.classList.toggle('active', active);
+      btn.title = active ? '關閉音訊感應' : '啟動音訊感應';
+    }
   },
 
   // --- 粒子系統 ---

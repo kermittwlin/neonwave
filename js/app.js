@@ -24,6 +24,7 @@ const App = {
     this.initModals();
     this.initKeyboard();
     this.initHideAll();
+    this.initEdgeHints();
     this.initMobileNav();
     this.state.isReady = true;
   },
@@ -206,6 +207,42 @@ const App = {
   toggleHideAll() {
     this.state.allHidden = !this.state.allHidden;
     document.body.classList.toggle('all-hidden', this.state.allHidden);
+  },
+
+  // --- 左右邊緣提示 ---
+  initEdgeHints() {
+    const leftHint = document.getElementById('left-hint');
+    const rightHint = document.getElementById('right-hint');
+
+    if (leftHint) {
+      leftHint.addEventListener('click', () => {
+        document.body.classList.add('panel-left-open');
+        document.body.classList.remove('panel-right-open');
+      });
+      leftHint.addEventListener('mouseenter', () => {
+        document.body.classList.add('panel-left-open');
+      });
+    }
+
+    if (rightHint) {
+      rightHint.addEventListener('click', () => {
+        document.body.classList.add('panel-right-open');
+        document.body.classList.remove('panel-left-open');
+      });
+      rightHint.addEventListener('mouseenter', () => {
+        document.body.classList.add('panel-right-open');
+      });
+    }
+
+    // 音訊感應按鈕
+    const captureBtn = document.getElementById('btn-audio-capture');
+    if (captureBtn) {
+      captureBtn.addEventListener('click', () => {
+        if (typeof Visualizer !== 'undefined') {
+          Visualizer.toggleAudioCapture();
+        }
+      });
+    }
   },
 
   // --- 手機底部導航 ---

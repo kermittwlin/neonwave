@@ -38,12 +38,25 @@
     </div>
   </div>
 
-  <!-- 全螢幕隱藏按鈕（永遠可見） -->
+  <!-- 隱藏全介面按鈕 -->
   <button id="btn-hide-all" type="button" class="floating-btn" title="隱藏/顯示所有面板">
-    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
       <path d="M18 6L6 18M6 6l12 12"/>
     </svg>
+    <span class="hide-label">隱藏全介面</span>
   </button>
+
+  <!-- 左側面板提示 -->
+  <div class="edge-hint left-hint" id="left-hint">
+    <div class="edge-hint-line"></div>
+    <div class="edge-hint-text">歌單</div>
+  </div>
+
+  <!-- 右側面板提示 -->
+  <div class="edge-hint right-hint" id="right-hint">
+    <div class="edge-hint-line"></div>
+    <div class="edge-hint-text">視覺控制台</div>
+  </div>
 
   <!-- 歌詞顯示區域 -->
   <div id="lyrics-display" class="lyrics-hidden">
@@ -149,6 +162,15 @@
     </div>
 
     <div class="panel-actions">
+      <button class="btn-neon small" id="btn-audio-capture" title="啟動音訊感應">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+        音訊感應
+      </button>
       <button class="btn-ghost" id="btn-reset-fx">恢復默認</button>
     </div>
   </aside>

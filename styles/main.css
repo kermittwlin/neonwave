@@ -1463,32 +1463,49 @@ input[type="range"]::-moz-range-thumb {
 
   #btn-hide-all {
     top: 10px;
-    left: 10px;
-    width: 36px;
-    height: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 16px;
+  }
+
+  .hide-label {
+    display: none;
+  }
+
+  .edge-hint {
+    display: none;
   }
 }
 
-/* --- 全螢幕隱藏按鈕 --- */
+/* --- 隱藏全介面按鈕 --- */
 #btn-hide-all {
   position: fixed;
-  top: 20px;
-  left: 20px;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 300;
-  width: 40px;
-  height: 40px;
+  height: 36px;
+  padding: 0 14px;
   background: var(--bg-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-glass);
-  border-radius: 50%;
+  border-radius: 18px;
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
   transition: all var(--transition-fast);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.hide-label {
+  font-size: 11px;
+  letter-spacing: 0.5px;
 }
 
 #btn-hide-all:hover {
@@ -1511,6 +1528,74 @@ body.all-hidden #btn-hide-all {
 
 body.all-hidden #btn-hide-all:hover {
   opacity: 1;
+}
+
+body.all-hidden .edge-hint {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* --- 左右邊緣提示 --- */
+.edge-hint {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.4;
+  transition: opacity 0.3s;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.edge-hint:hover {
+  opacity: 1;
+}
+
+.left-hint {
+  left: 0;
+  flex-direction: row;
+}
+
+.right-hint {
+  right: 0;
+  flex-direction: row-reverse;
+}
+
+.edge-hint-line {
+  width: 3px;
+  height: 60px;
+  background: var(--neon-pink);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--neon-pink);
+}
+
+.edge-hint-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.left-hint .edge-hint-text {
+  writing-mode: vertical-lr;
+}
+
+/* --- 音訊感應按鈕 --- */
+#audio-capture-btn,
+#btn-audio-capture {
+  transition: all 0.3s;
+}
+
+#btn-audio-capture.active {
+  background: var(--neon-pink);
+  color: #fff;
+  border-color: var(--neon-pink);
+  box-shadow: 0 0 12px var(--neon-pink);
 }
 
 /* --- 歌詞顯示 --- */
