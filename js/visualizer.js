@@ -346,17 +346,15 @@ const Visualizer = {
   animate() {
     requestAnimationFrame(() => this.animate());
 
-    const elapsed = this.clock.getElapsedTime() * this.config.speed;
+    const elapsed = this.clock.getElapsedTime();
 
     if (this.particles) {
-      // 獲取節奏數據
+      // 節奏數據
       const bass = this.rhythm.bass;
-      const mid = this.rhythm.mid;
-      const treble = this.rhythm.treble;
       const beat = this.beatDetector.beatIntensity;
       const isBeat = this.beatDetector.isBeat;
 
-      // 執行當前預設的更新
+      // 執行當前預設的更新（傳入原始時間，各預設自行乘以 speed）
       const preset = this.presets[this.currentPreset];
       if (preset && preset.update) {
         preset.update(elapsed);
@@ -388,18 +386,18 @@ const Visualizer = {
     const count = this.config.particleCount;
     const bass = this.rhythm.bass;
     const beat = this.beatDetector.beatIntensity;
+    const speed = this.config.speed;
+    const intensity = this.config.intensity;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const ratio = i / count;
 
-      // 基礎旋轉
-      const speed = this.config.intensity * (1 + bass * 0.5);
-      positions[i3] += Math.sin(t + ratio * 10) * 0.02 * speed;
-      positions[i3 + 1] += Math.cos(t + ratio * 10) * 0.02 * speed;
-      positions[i3 + 2] += Math.sin(t * 0.5 + ratio * 5) * 0.01 * speed;
+      const moveSpeed = speed * intensity * (1 + bass * 0.5);
+      positions[i3] += Math.sin(t * speed + ratio * 10) * 0.02 * moveSpeed;
+      positions[i3 + 1] += Math.cos(t * speed + ratio * 10) * 0.02 * moveSpeed;
+      positions[i3 + 2] += Math.sin(t * speed * 0.5 + ratio * 5) * 0.01 * moveSpeed;
 
-      // 節拍擴散效果
       if (this.config.beatReactive && beat > 0.3) {
         const dist = Math.sqrt(positions[i3] ** 2 + positions[i3 + 1] ** 2);
         const push = beat * 0.3 * (1 - dist / 50);
@@ -407,7 +405,6 @@ const Visualizer = {
         positions[i3 + 1] += (positions[i3 + 1] / (dist || 1)) * push;
       }
 
-      // 邊界循環
       if (positions[i3] > 50) positions[i3] = -50;
       if (positions[i3] < -50) positions[i3] = 50;
       if (positions[i3 + 1] > 50) positions[i3 + 1] = -50;
@@ -416,10 +413,9 @@ const Visualizer = {
 
     this.geometry.attributes.position.needsUpdate = true;
 
-    // 相機旋轉（受低音影響）
     const camSpeed = 0.1 + bass * 0.05;
-    this.camera.position.x = Math.sin(t * camSpeed) * 10;
-    this.camera.position.y = Math.cos(t * camSpeed) * 10;
+    this.camera.position.x = Math.sin(t * speed * camSpeed) * 10;
+    this.camera.position.y = Math.cos(t * speed * camSpeed) * 10;
     this.camera.lookAt(0, 0, 0);
   },
 
@@ -427,18 +423,18 @@ const Visualizer = {
     const positions = this.geometry.attributes.position.array;
     const count = this.config.particleCount;
     const bass = this.rhythm.bass;
+    const speed = this.config.speed;
+    const intensity = this.config.intensity;
 
-    // 流速受音樂影響
-    const fallSpeed = 0.3 + bass * 0.4;
+    const fallSpeed = (0.3 + bass * 0.4) * speed * intensity;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      positions[i3 + 1] -= fallSpeed * this.config.intensity;
+      positions[i3 + 1] -= fallSpeed;
 
-      // 節拍時粒子加速
       if (this.beatDetector.isBeat && Math.random() > 0.8) {
-        positions[i3 + 1] -= 5;
+        positions[i3 + 1] -= 5 * speed;
       }
 
       if (positions[i3 + 1] < -50) {
@@ -459,33 +455,29 @@ const Visualizer = {
     const positions = this.geometry.attributes.position.array;
     const initPos = this.initialPositions;
     const count = this.config.particleCount;
-    const mid = this.rhythm.mid;
     const beat = this.beatDetector.beatIntensity;
+    const intensity = this.config.intensity;
+    const speed = this.config.speed;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // 從初始位置讀取半徑和角度
       const initX = initPos[i3];
       const initY = initPos[i3 + 1];
       const initAngle = Math.atan2(initY, initX);
       const initRadius = Math.sqrt(initX * initX + initY * initY);
 
-      // 差異旋轉：內圈快、外圈慢（像星系）
+      // 差異旋轉：內圈快、外圈慢
       const speedFactor = 1 / (1 + initRadius * 0.03);
-      const rotSpeed = (0.02 + mid * 0.01) * speedFactor;
-      const newAngle = initAngle + t * rotSpeed * this.config.intensity;
+      const newAngle = initAngle + t * speed * 0.02 * speedFactor * intensity;
 
-      // 呼吸效果：內圈幅度大、外圈幅度小
-      const breatheAmount = (1 - initRadius / 50) * 0.15 + beat * 0.1;
-      const finalRadius = initRadius * (1 + Math.sin(t * 0.8) * breatheAmount);
+      // 呼吸效果
+      const breatheAmt = (1 - initRadius / 50) * 0.15 + beat * 0.1;
+      const finalRadius = initRadius * (1 + Math.sin(t * speed * 0.8) * breatheAmt);
 
-      // 設定位置
       positions[i3] = finalRadius * Math.cos(newAngle);
       positions[i3 + 1] = finalRadius * Math.sin(newAngle);
-
-      // Z 軸：輕微波動
-      positions[i3 + 2] = initPos[i3 + 2] * 0.5 + Math.sin(t * 0.4 + initAngle * 2) * 5;
+      positions[i3 + 2] = initPos[i3 + 2] * 0.5 + Math.sin(t * speed * 0.4 + initAngle * 2) * 5;
     }
 
     this.geometry.attributes.position.needsUpdate = true;
@@ -501,25 +493,24 @@ const Visualizer = {
     const count = this.config.particleCount;
     const treble = this.rhythm.treble;
     const beat = this.beatDetector.beatIntensity;
+    const speed = this.config.speed;
+    const intensity = this.config.intensity;
 
-    // 混亂程度受高音影響
-    const chaos = 0.1 + treble * 0.15;
+    const chaos = (0.1 + treble * 0.15) * speed * intensity;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      positions[i3] += (Math.random() - 0.5) * chaos * this.config.intensity;
-      positions[i3 + 1] += (Math.random() - 0.5) * chaos * this.config.intensity;
-      positions[i3 + 2] += (Math.random() - 0.5) * chaos * 0.5 * this.config.intensity;
+      positions[i3] += (Math.random() - 0.5) * chaos;
+      positions[i3 + 1] += (Math.random() - 0.5) * chaos;
+      positions[i3 + 2] += (Math.random() - 0.5) * chaos * 0.5;
 
-      // 節拍時粒子爆發
       if (this.beatDetector.isBeat && Math.random() > 0.7) {
         positions[i3] += (Math.random() - 0.5) * beat * 10;
         positions[i3 + 1] += (Math.random() - 0.5) * beat * 10;
         positions[i3 + 2] += (Math.random() - 0.5) * beat * 5;
       }
 
-      // 邊界
       if (Math.abs(positions[i3]) > 50) positions[i3] *= -0.9;
       if (Math.abs(positions[i3 + 1]) > 50) positions[i3 + 1] *= -0.9;
       if (Math.abs(positions[i3 + 2]) > 30) positions[i3 + 2] *= -0.9;
@@ -527,9 +518,8 @@ const Visualizer = {
 
     this.geometry.attributes.position.needsUpdate = true;
 
-    // 相機晃動（受節拍影響）
-    this.camera.position.x = Math.sin(t * 2) * 3 * (1 + beat);
-    this.camera.position.y = Math.cos(t * 1.5) * 3 * (1 + beat);
+    this.camera.position.x = Math.sin(t * speed * 2) * 3 * (1 + beat);
+    this.camera.position.y = Math.cos(t * speed * 1.5) * 3 * (1 + beat);
     this.camera.position.z = 50;
     this.camera.lookAt(0, 0, 0);
   },
