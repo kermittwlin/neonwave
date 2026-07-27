@@ -16,8 +16,6 @@ const STATIC_ASSETS = [
   '/js/visualizer.js',
   '/js/controls.js',
   '/js/lyrics.js',
-  '/js/sources/jamendo.js',
-  '/js/sources/index.js',
   '/manifest.json',
 ];
 
@@ -51,7 +49,6 @@ self.addEventListener('fetch', (event) => {
       event.request.url.includes('youtube.com') ||
       event.request.url.includes('ytimg.com') ||
       event.request.url.includes('lrclib.net') ||
-      event.request.url.includes('jamendo.com') ||
       event.request.url.includes('fonts.googleapis.com') ||
       event.request.url.includes('fonts.gstatic.com') ||
       event.request.url.includes('cdnjs.cloudflare.com')) {

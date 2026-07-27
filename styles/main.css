@@ -283,33 +283,6 @@ body.glow-on #visualizer-canvas {
   box-shadow: var(--shadow-panel), var(--glow-pink);
 }
 
-.source-selector {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  color: var(--text-primary);
-  font-size: 12px;
-  padding: 6px 10px;
-  cursor: pointer;
-  outline: none;
-  transition: all var(--transition-fast);
-  min-width: 80px;
-}
-
-.source-selector:hover {
-  border-color: var(--neon-pink);
-}
-
-.source-selector:focus {
-  border-color: var(--neon-pink);
-  box-shadow: 0 0 8px rgba(255, 45, 123, 0.3);
-}
-
-.source-selector option {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
 #search-submit,
 #search-clear,
 .settings-btn {
