@@ -4,8 +4,8 @@
 
 const JamendoSource = {
   name: 'Jamendo',
-  appId: 'neonwave',  // 免費註冊取得
-  isAvailable: true,
+  appId: localStorage.getItem('neonwave-jamendo-client-id') || '',
+  isAvailable: false, // 需要有效的 client_id
 
   // --- 搜尋音樂 ---
   async search(query, limit = 15) {

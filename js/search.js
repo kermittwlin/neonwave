@@ -23,6 +23,11 @@ const Search = {
     if (sourceSelect) {
       sourceSelect.value = SourceManager?.currentSource || 'youtube';
       sourceSelect.addEventListener('change', () => {
+        if (sourceSelect.value === 'jamendo') {
+          App.toast('Jamendo 需要有效的 API Key，請前往 devportal.jamendo.com 註冊', 'error');
+          sourceSelect.value = 'youtube';
+          return;
+        }
         SourceManager?.setSource(sourceSelect.value);
         App.toast(`已切換至 ${sourceSelect.options[sourceSelect.selectedIndex].text}`);
       });
