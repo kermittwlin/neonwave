@@ -216,23 +216,34 @@ const App = {
 
     if (leftHint) {
       leftHint.addEventListener('click', () => {
-        document.body.classList.add('panel-left-open');
-        document.body.classList.remove('panel-right-open');
-      });
-      leftHint.addEventListener('mouseenter', () => {
-        document.body.classList.add('panel-left-open');
+        const isOpen = document.body.classList.contains('panel-left-open');
+        document.body.classList.remove('panel-left-open', 'panel-right-open');
+        if (!isOpen) {
+          document.body.classList.add('panel-left-open');
+        }
       });
     }
 
     if (rightHint) {
       rightHint.addEventListener('click', () => {
-        document.body.classList.add('panel-right-open');
-        document.body.classList.remove('panel-left-open');
-      });
-      rightHint.addEventListener('mouseenter', () => {
-        document.body.classList.add('panel-right-open');
+        const isOpen = document.body.classList.contains('panel-right-open');
+        document.body.classList.remove('panel-left-open', 'panel-right-open');
+        if (!isOpen) {
+          document.body.classList.add('panel-right-open');
+        }
       });
     }
+
+    // 點擊面板外部區域關閉面板
+    document.addEventListener('click', (e) => {
+      if (!document.body.classList.contains('panel-left-open') &&
+          !document.body.classList.contains('panel-right-open')) return;
+      if (e.target.closest('.side-panel')) return;
+      if (e.target.closest('.edge-hint')) return;
+      if (e.target.closest('.mobile-nav')) return;
+      if (e.target.closest('#btn-hide-all')) return;
+      document.body.classList.remove('panel-left-open', 'panel-right-open');
+    });
 
     // 音訊感應按鈕
     const captureBtn = document.getElementById('btn-audio-capture');
@@ -290,12 +301,15 @@ const App = {
             this.closeAllPanels();
             break;
           case 'search':
+            this.closeAllPanels();
             document.getElementById('search-input').focus();
             break;
           case 'playlists':
+            document.body.classList.remove('panel-right-open');
             document.body.classList.toggle('panel-left-open');
             break;
           case 'visuals':
+            document.body.classList.remove('panel-left-open');
             document.body.classList.toggle('panel-right-open');
             break;
         }

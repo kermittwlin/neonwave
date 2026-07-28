@@ -1382,6 +1382,10 @@ input[type="range"]::-moz-range-thumb {
   .volume-control {
     display: none;
   }
+
+  .edge-hint {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
