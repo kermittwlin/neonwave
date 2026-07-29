@@ -471,9 +471,7 @@ const Search = {
 
   // --- HTML 轉義 ---
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return Utils.escapeHtml(text);
   },
 };
 

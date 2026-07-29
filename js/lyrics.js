@@ -160,6 +160,17 @@ const Lyrics = {
     container.innerHTML = this.lines.map((line, i) =>
       `<div class="lyrics-line" data-index="${i}">${this.escapeHtml(line.text)}</div>`
     ).join('');
+
+    // 點擊歌詞行跳轉到對應時間
+    container.querySelectorAll('.lyrics-line').forEach((el, i) => {
+      el.addEventListener('click', () => {
+        const time = this.lines[i]?.time;
+        if (time != null) {
+          Player.seekTo(time / (Player.getDuration() || 1));
+          if (!App.state.isPlaying) Player.togglePlay();
+        }
+      });
+    });
   },
 
   renderPlaceholder(text) {
@@ -222,9 +233,7 @@ const Lyrics = {
   },
 
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return Utils.escapeHtml(text);
   },
 };
 

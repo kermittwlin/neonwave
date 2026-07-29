@@ -153,7 +153,7 @@ const Player = {
     if (App.state.playMode === 'shuffle') {
       nextIndex = Math.floor(Math.random() * queue.length);
     } else {
-      const currentIndex = queue.findIndex(t => t.id === this.currentTrack?.id);
+      const currentIndex = queue.findIndex(t => t.id === App.state.currentTrack?.id);
       nextIndex = (currentIndex + 1) % queue.length;
     }
 
@@ -170,7 +170,7 @@ const Player = {
       return;
     }
 
-    const currentIndex = queue.findIndex(t => t.id === this.currentTrack?.id);
+    const currentIndex = queue.findIndex(t => t.id === App.state.currentTrack?.id);
     let prevIndex;
     if (App.state.playMode === 'shuffle') {
       prevIndex = Math.floor(Math.random() * queue.length);
