@@ -242,6 +242,7 @@ const App = {
       if (e.target.closest('.edge-hint')) return;
       if (e.target.closest('.mobile-nav')) return;
       if (e.target.closest('#btn-hide-all')) return;
+      if (e.target.closest('.home-card')) return;
       document.body.classList.remove('panel-left-open', 'panel-right-open');
     });
 
