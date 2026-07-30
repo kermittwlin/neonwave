@@ -8,6 +8,8 @@ const Controls = {
     this.initColorPickers();
     this.initToggles();
     this.initResetButton();
+    // 初始化時套用預設效果
+    document.body.classList.add('bloom-on');
   },
 
   // --- 滑桿控制 ---
@@ -96,7 +98,7 @@ const Controls = {
     });
 
     this.bindToggle('t-bloom', 'effects.bloom', (active) => {
-      // TODO: 實作溢光效果
+      document.body.classList.toggle('bloom-on', active);
     });
 
     this.bindToggle('t-grid', 'effects.grid', (active) => {
@@ -193,7 +195,7 @@ const Controls = {
     document.getElementById('t-grid').classList.add('active');
 
     // 重置背景
-    document.body.classList.remove('scanlines-on', 'chromatic-on');
+    document.body.classList.remove('scanlines-on', 'chromatic-on', 'bloom-on');
     document.body.style.setProperty('--bg-primary', '#0A0A0F');
     document.getElementById('bg-grid').style.opacity = '1';
   },
