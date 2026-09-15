@@ -149,22 +149,42 @@ const Playlist = {
 
     container.innerHTML = playlists.map(pl => `
       <div class="playlist-item" data-id="${pl.id}">
-        <div class="pl-icon">♫</div>
-        <div class="pl-info">
-          <div class="pl-name">${this.escapeHtml(pl.name)}</div>
-          <div class="pl-count">${pl.tracks.length} 首歌曲</div>
+        <div class="pl-header">
+          <div class="pl-icon">♫</div>
+          <div class="pl-info">
+            <div class="pl-name">${this.escapeHtml(pl.name)}</div>
+            <div class="pl-count">${pl.tracks.length} 首歌曲</div>
+          </div>
+          <div class="pl-actions">
+            <button class="pl-action-btn play-playlist" title="播放">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
+            <button class="pl-action-btn delete-playlist" title="刪除">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="pl-actions">
-          <button class="pl-action-btn play-playlist" title="播放">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          </button>
-          <button class="pl-action-btn delete-playlist" title="刪除">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-            </svg>
-          </button>
+        <div class="pl-tracks" style="display:none">
+          ${pl.tracks.length === 0
+            ? '<div class="empty-state small">歌單為空</div>'
+            : pl.tracks.map((t, i) => `
+              <div class="pl-track" data-index="${i}">
+                <span class="pl-track-num">${i + 1}</span>
+                <div class="pl-track-info">
+                  <div class="pl-track-title">${this.escapeHtml(t.title)}</div>
+                  <div class="pl-track-artist">${this.escapeHtml(t.artist || '未知')}</div>
+                </div>
+                <button class="pl-track-remove" title="移除">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            `).join('')}
         </div>
       </div>
     `).join('');
@@ -172,16 +192,50 @@ const Playlist = {
     container.querySelectorAll('.playlist-item').forEach(item => {
       const id = item.dataset.id;
 
+      // 點擊歌單標題展開/收合
+      item.querySelector('.pl-header').addEventListener('click', () => {
+        const tracksEl = item.querySelector('.pl-tracks');
+        const isVisible = tracksEl.style.display !== 'none';
+        tracksEl.style.display = isVisible ? 'none' : 'block';
+        item.classList.toggle('expanded', !isVisible);
+      });
+
+      // 播放歌單
       item.querySelector('.play-playlist').addEventListener('click', (e) => {
         e.stopPropagation();
         this.playPlaylist(id);
       });
 
+      // 刪除歌單
       item.querySelector('.delete-playlist').addEventListener('click', (e) => {
         e.stopPropagation();
         if (confirm('確定要刪除此歌單嗎？')) {
           this.deletePlaylist(id);
         }
+      });
+
+      // 移除歌單內歌曲
+      item.querySelectorAll('.pl-track-remove').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const trackEl = btn.closest('.pl-track');
+          const index = parseInt(trackEl.dataset.index);
+          const pl = App.state.playlists.find(p => p.id === id);
+          if (pl && pl.tracks[index]) {
+            this.removeFromPlaylist(id, pl.tracks[index].id);
+          }
+        });
+      });
+
+      // 點擊歌單內歌曲播放
+      item.querySelectorAll('.pl-track').forEach((trackEl, i) => {
+        trackEl.addEventListener('click', () => {
+          const pl = App.state.playlists.find(p => p.id === id);
+          if (pl && pl.tracks[i]) {
+            Player.addToQueue(pl.tracks[i]);
+            Player.playTrack(pl.tracks[i]);
+          }
+        });
       });
     });
   },

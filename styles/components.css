@@ -77,6 +77,94 @@
   background: rgba(255, 45, 123, 0.1);
 }
 
+/* --- 歌單展開的歌曲列表 --- */
+.playlist-item {
+  flex-wrap: wrap;
+}
+
+.playlist-item .pl-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.playlist-item.expanded {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-glass);
+}
+
+.playlist-item .pl-tracks {
+  width: 100%;
+  padding: 8px 0 4px 52px;
+}
+
+.pl-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.pl-track:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pl-track-num {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.pl-track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pl-track-title {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-track-artist {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-track-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pl-track:hover .pl-track-remove {
+  opacity: 1;
+}
+
+.pl-track-remove:hover {
+  color: var(--neon-pink);
+  background: rgba(255, 45, 123, 0.1);
+}
+
 /* --- 歌曲卡片（搜尋結果用） --- */
 .track-card {
   display: flex;
